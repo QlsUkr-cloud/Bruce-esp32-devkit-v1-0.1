@@ -1,0 +1,56 @@
+nerating partitions .pio\build\esp32dev\partitions.bin
+esptool.py v4.5.1
+Creating esp32 image...
+Merged 1 ELF section
+Successfully created esp32 image.
+Compiling .pio\build\esp32dev\lib015\SPI\SPI.cpp.o
+Compiling .pio\build\esp32dev\libe43\Wire\Wire.cpp.o
+Compiling .pio\build\esp32dev\lib7f7\U8g2\U8g2lib.cpp.o
+In file included from C:/Users/QlsUkr/.platformio/packages/framework-arduinoespressif32/libraries/SPI/src/SPI.cpp:22:
+C:/Users/QlsUkr/.platformio/packages/framework-arduinoespressif32/libraries/SPI/src/SPI.h:25:10: fatal error: pins_arduino.h: No such file or directory
+
+**********************************************************************
+* Looking for pins_arduino.h dependency? Check our library registry!
+*
+* CLI  > platformio lib search "header:pins_arduino.h"
+* Web  > https://registry.platformio.org/search?q=header:pins_arduino.h
+*
+**********************************************************************
+
+ #include "pins_arduino.h"
+          ^~~~~~~~~~~~~~~~
+compilation terminated.
+*** [.pio\build\esp32dev\lib015\SPI\SPI.cpp.o] Error 1
+In file included from C:/Users/QlsUkr/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/port/xtensa/include/freertos/FreeRTOSConfig_arch.h:40,
+                 from C:/Users/QlsUkr/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include/esp_additions/freertos/FreeRTOSConfig.h:16,
+                 from C:/Users/QlsUkr/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include/freertos/FreeRTOS.h:57,
+                 from C:/Users/QlsUkr/.platformio/packages/framework-arduinoespressif32/cores/esp32/Arduino.h:33,
+                 from .pio/libdeps/esp32dev/U8g2/src/U8g2lib.h:49,
+                 from .pio/libdeps/esp32dev/U8g2/src/U8g2lib.cpp:40:
+C:/Users/QlsUkr/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/port/xtensa/include/freertos/xtensa_config.h:40:10: fatal error: xtensa/hal.h: No such file or directory
+ #include <xtensa/hal.h>
+          ^~~~~~~~~~~~~~
+compilation terminated.
+In file included from C:/Users/QlsUkr/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/port/xtensa/include/freertos/FreeRTOSConfig_arch.h:40,
+                 from C:/Users/QlsUkr/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include/esp_additions/freertos/FreeRTOSConfig.h:16,
+                 from C:/Users/QlsUkr/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include/freertos/FreeRTOS.h:57,
+                 from C:/Users/QlsUkr/.platformio/packages/framework-arduinoespressif32/cores/esp32/Arduino.h:33,
+                 from src/main.cpp:8:
+C:/Users/QlsUkr/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/port/xtensa/include/freertos/xtensa_config.h:40:10: fatal error: xtensa/hal.h: No such file or directory
+ #include <xtensa/hal.h>
+          ^~~~~~~~~~~~~~
+compilation terminated.
+*** [.pio\build\esp32dev\lib7f7\U8g2\U8g2lib.cpp.o] Error 1
+*** [.pio\build\esp32dev\src\main.cpp.o] Error 1
+In file included from C:/Users/QlsUkr/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal.h:33,
+                 from C:/Users/QlsUkr/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src/Wire.h:29,
+                 from C:/Users/QlsUkr/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src/Wire.cpp:34:
+C:/Users/QlsUkr/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/esp_hw_support/include/esp_sleep.h:12:10: fatal error: hal/touch_sensor_types.h: No such file or directory
+ #include "hal/touch_sensor_types.h"
+          ^~~~~~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+*** [.pio\build\esp32dev\libe43\Wire\Wire.cpp.o] Error 1
+================================================== [FAILED] Took 8.46 seconds ==================================================
+
+ *  The terminal process "C:\Users\QlsUkr\.platformio\penv\Scripts\platformio.exe 'run'" terminated with exit code: 1. 
+ *  Terminal will be reused by tasks, press any key to close it. 
