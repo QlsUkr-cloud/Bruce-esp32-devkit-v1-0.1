@@ -1,0 +1,19 @@
+[env:esp32dev]
+platform = espressif32@6.6.0
+board = esp32dev
+framework = arduino
+monitor_speed = 115200
+upload_speed = 921600
+board_build.filesystem = littlefs
+board_build.partitions = custom_4Mb.csv
+
+build_flags =
+    -DCORE_DEBUG_LEVEL=0
+    -Os
+
+lib_deps =
+    olikraus/U8g2@^2.35.15
+    nrf24/RF24@^1.4.11
+    h2zero/NimBLE-Arduino@^2.3.9
+    crankyoldgit/IRremoteESP8266@^2.8.6
+    bblanchon/ArduinoJson@^7.4.2
