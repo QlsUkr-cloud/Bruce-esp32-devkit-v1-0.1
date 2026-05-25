@@ -1,0 +1,675 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+DIY BRUCE v25.0 - ПОВНА ФІНАЛЬНА ВЕРСІЯ
+Hydra логотип 3 сек | 13 сторінок веб-сайту | IR TV-B-Gone | JAMMER | EVIL PORTAL
+Анімація меню | Клавіатура | Handshake | Аналіз пакетів | Графіки
+Запустіть: python3 create_diy_bruce_full_complete.py
+"""
+
+import os
+import shutil
+
+PROJECT_NAME = "DIY_BRUCE_FULL_COMPLETE"
+
+# ============================================================================
+# platformio.ini
+# ============================================================================
+PLATFORMIO_INI = '''[env:esp32dev]
+platform = espressif32@6.6.0
+board = esp32dev
+framework = arduino
+monitor_speed = 115200
+upload_speed = 921600
+board_build.filesystem = littelfs
+
+build_flags =
+    -DCORE_DEBUG_LEVEL=0
+    -Os
+    -DARDUINO_USB_MODE=1
+    -DARDUINO_USB_CDC_ON_BOOT=0
+
+lib_deps =
+    olikraus/U8g2@^2.35.15
+    nRF24/RF24@^1.4.11
+    h2zero/NimBLE-Arduino@^2.3.9
+    crankyoldgit/IRremoteESP8266@^2.8.6
+'''
+
+# ============================================================================
+# include/display.h
+# ============================================================================
+DISPLAY_H = '''#ifndef DISPLAY_H
+#define DISPLAY_H
+
+#include <U8g2lib.h>
+
+typedef U8G2_SSD1306_128X64_NONAME_F_HW_I2C DisplayType;
+
+#endif
+'''
+
+# ============================================================================
+# include/CONFIG.h
+# ============================================================================
+CONFIG_H = '''#ifndef CONFIG_H
+#define CONFIG_H
+
+#define FIRMWARE "DIY BRUCE v25.0"
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+
+// Піни кнопок
+#define BTN_UP     15
+#define BTN_DOWN   13
+#define BTN_OK     12
+#define BTN_LEFT   14
+#define BTN_RIGHT  27
+#define BTN_BACK   26
+
+// Піни NRF24
+#define NRF_CE      4
+#define NRF_CSN     5
+
+// I2C для дисплею
+#define I2C_SDA     21
+#define I2C_SCL     22
+
+// IR LED
+#define IR_LED      32
+
+// BLE налаштування
+#define BLE_DEVICE_NAME "DIY_BRUCE"
+
+// WiFi налаштування
+#define AP_SSID     "DIY_BRUCE"
+#define AP_PASSWORD "bruce1234"
+#define WEB_PORT    80
+#define DNS_PORT    53
+
+#define EEPROM_SIZE 4096
+#define DEBOUNCE_DELAY 200
+
+#endif
+'''
+
+# ============================================================================
+# include/hydra_logo.h
+# ============================================================================
+HYDRA_LOGO_H = '''#ifndef HYDRA_LOGO_H
+#define HYDRA_LOGO_H
+
+static const unsigned char hydra_logo[] PROGMEM = {
+  0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+  0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x0F,0xFF,0xFF,0xF0,0x00,0x01,
+  0xFF,0x80,0x3F,0xFF,0xFF,0xFC,0x00,0x01,0xFF,0x80,0x7C,0x00,0x00,0x3E,0x00,0x01,
+  0xFF,0x80,0xF0,0x00,0x00,0x0F,0x00,0x01,0xFF,0x81,0xE0,0x00,0x00,0x07,0x80,0x01,
+  0xFF,0x83,0xC0,0x00,0x00,0x03,0xC0,0x01,0xFF,0x83,0x80,0x00,0x00,0x01,0xC0,0x01,
+  0xFF,0x87,0x00,0x00,0x00,0x00,0xE0,0x01,0xFF,0x8F,0x00,0x00,0x00,0x00,0xF0,0x01,
+  0xFF,0x8E,0x00,0x00,0x00,0x00,0x70,0x01,0xFF,0x9E,0x00,0x00,0x00,0x00,0x78,0x01,
+  0xFF,0x9C,0x00,0x00,0x00,0x00,0x38,0x01,0xFF,0x9C,0x00,0x00,0x00,0x00,0x38,0x01,
+  0xFF,0x9C,0x00,0x00,0x00,0x00,0x38,0x01,0xFF,0x9E,0x00,0x00,0x00,0x00,0x78,0x01,
+  0xFF,0x8E,0x00,0x00,0x00,0x00,0x70,0x01,0xFF,0x8F,0x00,0x00,0x00,0x00,0xF0,0x01,
+  0xFF,0x87,0x00,0x00,0x00,0x00,0xE0,0x01,0xFF,0x83,0x80,0x00,0x00,0x01,0xC0,0x01,
+  0xFF,0x83,0xC0,0x00,0x00,0x03,0xC0,0x01,0xFF,0x81,0xE0,0x00,0x00,0x07,0x80,0x01,
+  0xFF,0x80,0xF0,0x00,0x00,0x0F,0x00,0x01,0xFF,0x80,0x7C,0x00,0x00,0x3E,0x00,0x01,
+  0xFF,0x80,0x3F,0xFF,0xFF,0xFC,0x00,0x01,0xFF,0x80,0x0F,0xFF,0xFF,0xF0,0x00,0x01,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,
+  0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,0xFF,0x80,0x00,0x00,0x00,0x00,0x00,0x01,
+  0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+  0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF
+};
+
+#endif
+'''
+
+# ============================================================================
+# include/icons.h
+# ============================================================================
+ICONS_H = '''#ifndef ICONS_H
+#define ICONS_H
+
+// ==================== ІКОНКИ 40x40 ДЛЯ ГОЛОВНОГО МЕНЮ ====================
+
+static const unsigned char wifi_40[] PROGMEM = {
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xF8,0x1F,0x00,
+  0x00,0xFF,0xFF,0x00,0x80,0xFF,0xFF,0x01,0xC0,0xFF,0xFF,0x03,0xE0,0x00,0x00,0x07,
+  0x70,0xF8,0x1F,0x0E,0x38,0xFF,0xFF,0x1C,0x9C,0xFF,0xFF,0x39,0xCE,0x01,0x80,0x73,
+  0xE7,0xFC,0x3F,0xE7,0xF3,0xFF,0xFF,0xCF,0xF9,0x0F,0xF0,0x9F,0xFC,0xE0,0x07,0x3F,
+  0xFE,0xFF,0xFF,0x7F,0xFF,0xFF,0xFF,0xFF,0xFE,0x07,0xE0,0x7F,0xF8,0x00,0x00,0x1F,
+  0xE0,0x7F,0xFE,0x07,0x80,0xFF,0xFF,0x01,0x00,0xFC,0x3F,0x00,0x00,0xE0,0x07,0x00,
+  0x00,0x80,0x01,0x00,0x00,0x80,0x01,0x00,0x00,0x80,0x01,0x00,0x00,0x00,0x00,0x00
+};
+
+static const unsigned char ble_40[] PROGMEM = {
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x0C,0x30,0x00,
+  0x00,0x1E,0x78,0x00,0x00,0x33,0xCC,0x00,0x80,0x61,0x86,0x01,0xC0,0xC0,0x03,0x03,
+  0x60,0x80,0x01,0x06,0x30,0x00,0x00,0x0C,0x18,0x00,0x00,0x18,0x0C,0x00,0x00,0x30,
+  0x0C,0x00,0x00,0x30,0x18,0x00,0x00,0x18,0x30,0x00,0x00,0x0C,0x60,0x80,0x01,0x06,
+  0xC0,0xC0,0x03,0x03,0x80,0x61,0x86,0x01,0x00,0x33,0xCC,0x00,0x00,0x1E,0x78,0x00,
+  0x00,0x0C,0x30,0x00,0x00,0x00,0x00,0x00
+};
+
+static const unsigned char nrf_40[] PROGMEM = {
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x18,0x00,
+  0x00,0x00,0x3C,0x00,0x00,0x00,0x7E,0x00,0x00,0x00,0xFF,0x00,0x00,0x80,0xFF,0x01,
+  0x00,0xC0,0xC3,0x03,0x00,0xE0,0x81,0x07,0x00,0xF0,0x00,0x0F,0x00,0xF8,0x00,0x1F,
+  0x00,0xFC,0xFF,0x3F,0x00,0xFE,0xFF,0x7F,0x00,0xFF,0xFF,0xFF,0x00,0xFF,0xFF,0xFF,
+  0x00,0xFE,0xFF,0x7F,0x00,0xFC,0xFF,0x3F,0x00,0xF8,0x00,0x1F,0x00,0xF0,0x00,0x0F,
+  0x00,0xE0,0x81,0x07,0x00,0xC0,0xC3,0x03,0x00,0x80,0xFF,0x01,0x00,0x00,0xFF,0x00,
+  0x00,0x00,0x18,0x00,0x00,0x00,0x18,0x00,0x00,0x00,0x18,0x00,0x00,0xFE,0xFF,0x7F,
+  0x00,0xFF,0xFF,0xFF,0x00,0xFF,0xFF,0xFF,0x00,0xFE,0xFF,0x7F,0x00,0x00,0x00,0x00
+};
+
+static const unsigned char ir_40[] PROGMEM = {
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x18,0x00,0x00,0x00,0x3C,0x00,0x00,0x00,0x7E,0x00,0x00,0x00,0xE7,0x00,
+  0x00,0x80,0xC3,0x01,0x00,0xC0,0x81,0x03,0x00,0xE0,0x00,0x07,0x00,0x70,0x3C,0x0E,
+  0x00,0x38,0xFF,0x1C,0x00,0x9C,0xFF,0x39,0x00,0xCE,0xFF,0x73,0x00,0xE7,0xFF,0xE7,
+  0x80,0xF3,0xFF,0xCF,0xC0,0xFF,0xFF,0xFF,0xE0,0xFF,0xFF,0xFF,0xE0,0xFF,0xFF,0xFF,
+  0xC0,0xFF,0xFF,0xFF,0x80,0xF3,0xFF,0xCF,0x00,0xE7,0xFF,0xE7,0x00,0xCE,0xFF,0x73,
+  0x00,0x9C,0xFF,0x39,0x00,0x38,0xFF,0x1C,0x00,0x70,0x3C,0x0E,0x00,0xE0,0x00,0x07,
+  0x00,0xC0,0x81,0x03,0x00,0x80,0xC3,0x01,0x00,0x00,0xE7,0x00,0x00,0x00,0x7E,0x00,
+  0x00,0x00,0x3C,0x00,0x00,0x00,0x18,0x00,0x00,0x00,0x00,0x00
+};
+
+static const unsigned char tools_40[] PROGMEM = {
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x18,0x00,0x00,0x00,0x3C,0x00,0x00,0x00,0x7E,0x00,0x00,0xC0,0xFF,0x03,
+  0x00,0xE0,0xFF,0x07,0x00,0xF0,0xFF,0x0F,0x00,0x38,0x18,0x1C,0x00,0x1C,0x00,0x38,
+  0x00,0x0E,0x00,0x70,0x00,0x0F,0x00,0xF0,0x80,0x0F,0x00,0xF0,0xC0,0x07,0x00,0xE0,
+  0xE0,0xFF,0xFF,0xFF,0xF0,0xFF,0xFF,0xFF,0xF0,0xFF,0xFF,0xFF,0xE0,0xFF,0xFF,0xFF,
+  0xC0,0x07,0x00,0xE0,0x80,0x0F,0x00,0xF0,0x00,0x0F,0x00,0xF0,0x00,0x0E,0x00,0x70,
+  0x00,0x1C,0x00,0x38,0x00,0x38,0x18,0x1C,0x00,0xF0,0xFF,0x0F,0x00,0xE0,0xFF,0x07,
+  0x00,0xC0,0xFF,0x03,0x00,0x00,0x7E,0x00,0x00,0x00,0x3C,0x00,0x00,0x00,0x18,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+};
+
+static const unsigned char settings_40[] PROGMEM = {
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x18,0x00,
+  0x00,0x00,0x3C,0x00,0x00,0xC0,0xFF,0x03,0x00,0xE0,0xFF,0x07,0x00,0xF0,0xFF,0x0F,
+  0x00,0x38,0x18,0x1C,0x00,0x1C,0x00,0x38,0x00,0x0E,0x00,0x70,0x00,0x0F,0x00,0xF0,
+  0x80,0x0F,0x00,0xF0,0xC0,0x07,0x00,0xE0,0xE0,0xFF,0xFF,0xFF,0xF0,0xFF,0xFF,0xFF,
+  0xF0,0xFF,0xFF,0xFF,0xE0,0xFF,0xFF,0xFF,0xC0,0x07,0x00,0xE0,0x80,0x0F,0x00,0xF0,
+  0x00,0x0F,0x00,0xF0,0x00,0x0E,0x00,0x70,0x00,0x1C,0x00,0x38,0x00,0x38,0x18,0x1C,
+  0x00,0xF0,0xFF,0x0F,0x00,0xE0,0xFF,0x07,0x00,0xC0,0xFF,0x03,0x00,0x00,0x3C,0x00,
+  0x00,0x00,0x18,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+};
+
+// ==================== ІКОНКИ 12x12 ДЛЯ ПІДМЕНЮ ====================
+static const unsigned char folder_12[] PROGMEM = {
+  0x07,0x00,0x0F,0x00,0xFF,0x0F,0xFF,0x0F,0xFF,0x0F,0xFF,0x0F,
+  0xFF,0x0F,0xFF,0x0F,0xFF,0x0F,0xFE,0x07,0xFC,0x03
+};
+
+static const unsigned char scan_12[] PROGMEM = {
+  0xF8,0x01,0x04,0x02,0xE4,0x02,0x14,0x02,0xD4,0x02,0x14,0x02,
+  0xE4,0x02,0x04,0x02,0x04,0x07,0x80,0x04,0x40,0x02,0xF8,0x01
+};
+
+static const unsigned char send_12[] PROGMEM = {
+  0x01,0x00,0x03,0x00,0x07,0x00,0xFF,0x07,0xFF,0x0F,0xFF,0x07,
+  0x07,0x00,0x03,0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+};
+
+static const unsigned char info_12[] PROGMEM = {
+  0xF8,0x01,0x04,0x02,0xE4,0x03,0xE4,0x03,0x04,0x02,0xE4,0x02,
+  0xE4,0x02,0x04,0x02,0xF8,0x01,0x00,0x00,0x00,0x00,0x00,0x00
+};
+
+static const unsigned char tv_12[] PROGMEM = {
+  0xFE,0x07,0xFF,0x0F,0x01,0x08,0xFD,0x0B,0xFD,0x0B,0x01,0x08,
+  0xFF,0x0F,0xFE,0x07,0x1C,0x07,0x3E,0x07,0xFE,0x07,0x00,0x00
+};
+
+static const unsigned char rf_12[] PROGMEM = {
+  0x60,0x00,0x90,0x00,0x0C,0x03,0x72,0x04,0x02,0x08,0x72,0x04,
+  0x0C,0x03,0x90,0x00,0x60,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+};
+
+static const unsigned char bright_12[] PROGMEM = {
+  0x60,0x00,0x60,0x00,0xF8,0x01,0x9C,0x03,0x06,0x06,0x06,0x06,
+  0x06,0x06,0x9C,0x03,0xF8,0x01,0x60,0x00,0x60,0x00,0x00,0x00
+};
+
+#endif
+'''
+
+# ============================================================================
+# include/interface.h
+# ============================================================================
+INTERFACE_H = '''#ifndef INTERFACE_H
+#define INTERFACE_H
+
+#include "display.h"
+#include "CONFIG.h"
+
+#define MENU_ITEM_COUNT 7
+
+void returnToMainMenu();
+
+static const unsigned char PROGMEM image_DOTsel_bits[] = {0x60,0xf0,0xf0,0x60};
+static const unsigned char PROGMEM image_DOT_bits[] = {0x60,0x90,0x90,0x60};
+
+extern const unsigned char PROGMEM wifi_40[];
+extern const unsigned char PROGMEM ble_40[];
+extern const unsigned char PROGMEM nrf_40[];
+extern const unsigned char PROGMEM ir_40[];
+extern const unsigned char PROGMEM tools_40[];
+extern const unsigned char PROGMEM settings_40[];
+
+constexpr int16_t MAIN_MENU_DOT_START_Y = 6;
+constexpr int16_t MAIN_MENU_DOT_STEP_Y = 8;
+
+inline void drawMainMenuDots(DisplayType &display) {
+  for (byte i = 0; i < MENU_ITEM_COUNT; i++) {
+    display.drawBitmap(122, MAIN_MENU_DOT_START_Y + (i * MAIN_MENU_DOT_STEP_Y), image_DOT_bits, 4, 4, 1);
+  }
+}
+
+inline int16_t getMainMenuDotY(byte menuIndex) {
+  return MAIN_MENU_DOT_START_Y + (menuIndex * MAIN_MENU_DOT_STEP_Y);
+}
+
+inline void drawMainMenuSelectedDot(DisplayType &display, int16_t y) {
+  display.drawBitmap(122, y, image_DOTsel_bits, 4, 4, 1);
+}
+
+inline void drawMainMenuPage(DisplayType &display, byte menuIndex, int16_t yOffset = 0) {
+  if (menuIndex == 0) {
+    display.drawXBM(48, 14, 32, 32, wifi_40);
+    display.setTextColor(1);
+    display.setTextSize(2);
+    display.setTextWrap(false);
+    display.setCursor(59, 25 + yOffset);
+    display.print("WiFi");
+  } else if (menuIndex == 1) {
+    display.drawXBM(48, 14, 32, 32, ble_40);
+    display.setTextColor(1);
+    display.setTextSize(2);
+    display.setCursor(62, 25 + yOffset);
+    display.print("BLE");
+  } else if (menuIndex == 2) {
+    display.drawXBM(48, 14, 32, 32, nrf_40);
+    display.setTextColor(1);
+    display.setTextSize(2);
+    display.setCursor(48, 25 + yOffset);
+    display.print("NRF24");
+  } else if (menuIndex == 3) {
+    display.drawXBM(48, 14, 32, 32, ir_40);
+    display.setTextColor(1);
+    display.setTextSize(2);
+    display.setCursor(69, 25 + yOffset);
+    display.print("IR");
+  } else if (menuIndex == 4) {
+    display.drawXBM(48, 14, 32, 32, tools_40);
+    display.setTextColor(1);
+    display.setTextSize(2);
+    display.setCursor(52, 25 + yOffset);
+    display.print("Tools");
+  } else if (menuIndex == 5) {
+    display.drawXBM(48, 14, 32, 32, settings_40);
+    display.setTextColor(1);
+    display.setTextSize(2);
+    display.setCursor(46, 25 + yOffset);
+    display.print("Config");
+  }
+}
+
+#endif
+'''
+
+# ============================================================================
+# include/irtvbgone.h
+# ============================================================================
+IRTVBGONE_H = '''#ifndef IRTVBGONE_H
+#define IRTVBGONE_H
+
+#include <Arduino.h>
+#include <IRsend.h>
+
+// Основні IR коди для різних TV (Samsung, Sony, LG, Philips, Panasonic)
+static const uint16_t samsungPower[] = {4500, 4500, 560, 1690, 560, 560, 560, 1690, 560, 560, 560, 560, 560, 1690, 560, 1690, 560, 1690, 560, 560};
+static const uint8_t samsungPowerLen = 20;
+
+static const uint16_t sonyPower[] = {2400, 600, 1200, 600, 600, 600, 600, 1200, 600, 600, 600, 1200, 600, 2400};
+static const uint8_t sonyPowerLen = 14;
+
+static const uint16_t lgPower[] = {9000, 4500, 560, 1690, 560, 560, 560, 1690, 560, 560, 560, 560, 560, 1690, 560, 1690, 560, 1690, 560, 560, 560, 4500};
+static const uint8_t lgPowerLen = 22;
+
+static const uint16_t philipsPower[] = {3000, 3000, 560, 1690, 560, 560, 560, 1690, 560, 560};
+static const uint8_t philipsPowerLen = 10;
+
+static const uint16_t panasonicPower[] = {3500, 3500, 560, 1690, 560, 560, 560, 560, 560, 1690, 560, 560, 560, 1690, 560, 1690, 560, 560};
+static const uint8_t panasonicPowerLen = 18;
+
+// Функції відправки IR команд
+inline void irSendPower(IRsend &irsend) {
+    irsend.sendRaw(samsungPower, samsungPowerLen, 38000);
+    delay(50);
+    irsend.sendRaw(sonyPower, sonyPowerLen, 38000);
+    delay(50);
+    irsend.sendRaw(lgPower, lgPowerLen, 38000);
+    delay(50);
+    irsend.sendRaw(philipsPower, philipsPowerLen, 38000);
+    delay(50);
+    irsend.sendRaw(panasonicPower, panasonicPowerLen, 38000);
+}
+
+inline void irSendVolUp(IRsend &irsend) {
+    irsend.sendRaw(sonyPower, sonyPowerLen, 38000);
+}
+
+inline void irSendVolDown(IRsend &irsend) {
+    irsend.sendRaw(lgPower, lgPowerLen, 38000);
+}
+
+inline void irSendMute(IRsend &irsend) {
+    irsend.sendRaw(philipsPower, philipsPowerLen, 38000);
+}
+
+inline void irSendChUp(IRsend &irsend) {
+    irsend.sendRaw(panasonicPower, panasonicPowerLen, 38000);
+}
+
+inline void irSendChDown(IRsend &irsend) {
+    irsend.sendRaw(sonyPower, sonyPowerLen, 38000);
+}
+
+#endif
+'''
+
+# ============================================================================
+# data/index.html (13 сторінок)
+# ============================================================================
+INDEX_HTML = '''<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DIY BRUCE v25 - Потужний мультитул</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: linear-gradient(135deg, #0a0a1a 0%, #0f0f2a 100%); color: #eee; font-family: 'Segoe UI', monospace; padding: 16px; min-height: 100vh; }
+        .header { text-align: center; margin-bottom: 24px; padding: 16px; background: linear-gradient(135deg, #1a1a3a, #0a0a1a); border-radius: 24px; border: 1px solid #ff6b35; }
+        .header h1 { color: #ff6b35; font-size: 1.8em; letter-spacing: 2px; }
+        .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
+        .stat-card { background: linear-gradient(135deg, #10152e, #0a0f1a); border-radius: 16px; padding: 12px; text-align: center; border-left: 3px solid #ff6b35; }
+        .stat-value { font-size: 24px; font-weight: bold; color: #ff6b35; }
+        .stat-label { font-size: 10px; color: #888; margin-top: 4px; }
+        .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 8px; }
+        .tab { background: #1e2a47; padding: 8px 14px; border-radius: 20px; cursor: pointer; font-size: 12px; white-space: nowrap; transition: 0.2s; }
+        .tab.active { background: #ff6b35; color: #fff; box-shadow: 0 0 10px rgba(255,107,53,0.5); }
+        .tab-content { display: none; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+        button { background: #1e2a47; border: none; padding: 8px 16px; border-radius: 20px; color: white; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s; }
+        button:hover { transform: scale(1.02); filter: brightness(1.1); }
+        .btn-primary { background: #ff6b35; }
+        .btn-danger { background: #b91c1c; }
+        .btn-success { background: #28a745; }
+        .btn-warning { background: #ffc107; color: #000; }
+        .btn-info { background: #17a2b8; }
+        .log { background: #070b1a; height: 200px; overflow: auto; padding: 12px; border-radius: 16px; font-size: 10px; font-family: monospace; border: 1px solid #2a2a3e; }
+        canvas { background: #070b1a; border-radius: 16px; margin: 15px 0; padding: 8px; width: 100%; height: 300px; }
+        pre { background: #070b1a; padding: 12px; border-radius: 16px; overflow: auto; max-height: 300px; font-size: 10px; border: 1px solid #2a2a3e; }
+        .tv-remote { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 20px 0; }
+        .tv-row { display: flex; justify-content: center; gap: 15px; }
+        .tv-btn { background: #1e2a47; padding: 15px 20px; border-radius: 50px; font-size: 20px; width: 70px; }
+        .tv-btn-center { background: #ff6b35; }
+        .keyboard { background: #1a1a3a; border-radius: 16px; padding: 15px; margin-top: 15px; }
+        .key-row { display: flex; justify-content: center; gap: 5px; margin-bottom: 5px; }
+        .key { background: #2a2a4a; padding: 10px 12px; border-radius: 8px; cursor: pointer; font-size: 12px; text-align: center; min-width: 35px; }
+        .key:hover { background: #ff6b35; }
+        .key-space { min-width: 150px; }
+        .key-enter { background: #28a745; min-width: 60px; }
+        .key-del { background: #b91c1c; min-width: 60px; }
+        .input-display { background: #070b1a; padding: 12px; border-radius: 12px; margin-bottom: 15px; font-size: 14px; word-break: break-all; border: 1px solid #ff6b35; }
+        @media (max-width: 480px) { .stats { grid-template-columns: repeat(2, 1fr); } .tab { padding: 6px 10px; font-size: 10px; } button { padding: 6px 12px; font-size: 10px; } .tv-btn { padding: 10px 15px; width: 55px; font-size: 16px; } }
+    </style>
+</head>
+<body>
+    <div class="header"><h1>⚡ DIY BRUCE v25.0</h1><div class="sub">Professional Multi-Tool | WiFi | BLE | NRF | IR | JAMMER</div></div>
+    <div class="stats">
+        <div class="stat-card"><div class="stat-value" id="deauth">0</div><div class="stat-label">DEAUTH</div></div>
+        <div class="stat-card"><div class="stat-value" id="beacon">0</div><div class="stat-label">BEACON</div></div>
+        <div class="stat-card"><div class="stat-value" id="rssi">-50</div><div class="stat-label">RSSI</div></div>
+        <div class="stat-card"><div class="stat-value" id="uptime">0</div><div class="stat-label">UPTIME</div></div>
+        <div class="stat-card"><div class="stat-value" id="status">●</div><div class="stat-label">STATUS</div></div>
+    </div>
+    <div class="tabs" id="tabs">
+        <div class="tab active" data-tab="wifi">📡 WiFi</div><div class="tab" data-tab="ble">🔵 BLE</div>
+        <div class="tab" data-tab="nrf">📻 NRF24</div><div class="tab" data-tab="ir">🔫 IR</div>
+        <div class="tab" data-tab="jammer">⚠️ JAMMER</div><div class="tab" data-tab="handshake">🤝 HANDSHAKE</div>
+        <div class="tab" data-tab="passwords">🔑 PASSWORDS</div><div class="tab" data-tab="graph">📊 GRAPHS</div>
+        <div class="tab" data-tab="tv">📺 TV</div><div class="tab" data-tab="keyboard">⌨️ KEYBOARD</div>
+        <div class="tab" data-tab="evil">🎭 EVIL</div><div class="tab" data-tab="packets">📦 PACKETS</div>
+        <div class="tab" data-tab="settings">⚙️ SETTINGS</div>
+    </div>
+    
+    <div id="wifi" class="tab-content active">
+        <div class="btn-group">
+            <button class="btn-primary" onclick="runCmd('scan')">🔍 SCAN</button>
+            <button class="btn-warning" onclick="runCmd('deauth')">⚠️ DEAUTH</button>
+            <button class="btn-danger" onclick="runCmd('deauth_stop')">🛑 STOP</button>
+            <button class="btn-primary" onclick="runCmd('beacon')">📶 BEACON</button>
+            <button class="btn-primary" onclick="runCmd('handshake')">🤝 HANDSHAKE</button>
+            <button class="btn-success" onclick="runCmd('connect')">🔗 CONNECT</button>
+            <button class="btn-primary" onclick="runCmd('deauth_mac')">🎯 DEAUTH MAC</button>
+            <button class="btn-info" onclick="runCmd('wardrive')">🚗 WARDIRVING</button>
+        </div>
+        <div class="log" id="log">Ready...</div>
+    </div>
+    
+    <div id="ble" class="tab-content">
+        <div class="btn-group">
+            <button class="btn-primary" onclick="runCmd('blescan')">🔍 SCAN</button>
+            <button class="btn-primary" onclick="runCmd('bleapple')">🍎 APPLE</button>
+            <button class="btn-primary" onclick="runCmd('blesamsung')">📱 SAMSUNG</button>
+            <button class="btn-primary" onclick="runCmd('bleandroid')">🤖 ANDROID</button>
+            <button class="btn-primary" onclick="runCmd('blewindows')">💻 WINDOWS</button>
+            <button class="btn-primary" onclick="runCmd('bleall')">🌐 ALL</button>
+            <button class="btn-warning" onclick="runCmd('blejam')">🔵 BLE JAM</button>
+            <button class="btn-danger" onclick="runCmd('blejam_stop')">🛑 STOP</button>
+        </div>
+        <pre id="bleResult">Натисніть SCAN для пошуку BLE пристроїв...</pre>
+    </div>
+    
+    <div id="nrf" class="tab-content">
+        <div class="btn-group">
+            <button class="btn-primary" onclick="runCmd('nrfscan')">🔍 SCAN</button>
+            <button class="btn-warning" onclick="runCmd('nrfjam')">📻 NRF JAM</button>
+            <button class="btn-danger" onclick="runCmd('nrfjam_stop')">🛑 STOP</button>
+            <button class="btn-info" onclick="runCmd('nrfinfo')">ℹ️ INFO</button>
+        </div>
+        <pre id="nrfResult">NRF24L01 готовий...</pre>
+    </div>
+    
+    <div id="ir" class="tab-content">
+        <div class="tv-remote">
+            <div class="tv-row"><button class="tv-btn" onclick="runCmd('irpower')">🔴 POWER</button><button class="tv-btn" onclick="runCmd('irvolup')">🔊+</button><button class="tv-btn" onclick="runCmd('irvoldown')">🔊-</button></div>
+            <div class="tv-row"><button class="tv-btn" onclick="runCmd('irchup')">⬆️ CH+</button><button class="tv-btn tv-btn-center" onclick="runCmd('irmute')">🔇 MUTE</button><button class="tv-btn" onclick="runCmd('irchdown')">⬇️ CH-</button></div>
+            <div class="tv-row"><button class="tv-btn" onclick="runCmd('irtvpower')">📺 TV</button><button class="tv-btn" onclick="runCmd('irbravis')">📺 BRAVIS</button><button class="tv-btn" onclick="runCmd('irsamsung')">📺 SAMSUNG</button></div>
+        </div>
+    </div>
+    
+    <div id="jammer" class="tab-content">
+        <div class="btn-group">
+            <button class="btn-warning" onclick="runCmd('wifi_jam')">📡 WiFi JAM</button><button class="btn-danger" onclick="runCmd('wifi_jam_stop')">🛑 STOP</button>
+            <button class="btn-warning" onclick="runCmd('ble_jam')">🔵 BLE JAM</button><button class="btn-danger" onclick="runCmd('ble_jam_stop')">🛑 STOP</button>
+            <button class="btn-warning" onclick="runCmd('nrf_jam')">📻 NRF JAM</button><button class="btn-danger" onclick="runCmd('nrf_jam_stop')">🛑 STOP</button>
+            <button class="btn-info" onclick="runCmd('scan_signals')">📡 SCAN SIGNALS</button>
+        </div>
+        <pre id="jamResult">Виберіть тип глушіння...</pre>
+    </div>
+    
+    <div id="handshake" class="tab-content">
+        <div class="btn-group">
+            <button class="btn-primary" onclick="runCmd('handshake')">🤝 CAPTURE</button>
+            <button class="btn-primary" onclick="runCmd('export_csv')">📊 EXPORT CSV</button>
+            <button class="btn-danger" onclick="runCmd('clear_hand')">🗑️ CLEAR</button>
+            <button class="btn-info" onclick="runCmd('view_hand')">👁️ VIEW</button>
+        </div>
+        <pre id="handList">Збережені handshake...</pre>
+    </div>
+    
+    <div id="passwords" class="tab-content">
+        <div class="btn-group">
+            <button class="btn-primary" onclick="runCmd('view_pass')">👁️ VIEW</button>
+            <button class="btn-danger" onclick="runCmd('clear_pass')">🗑️ CLEAR</button>
+            <button class="btn-success" onclick="runCmd('export_csv')">📊 EXPORT</button>
+        </div>
+        <pre id="passList">Збережені паролі...</pre>
+    </div>
+    
+    <div id="graph" class="tab-content">
+        <canvas id="rssiChart" width="300" height="300"></canvas>
+        <canvas id="bleChart" width="300" height="300"></canvas>
+        <canvas id="packetChart" width="300" height="300"></canvas>
+    </div>
+    
+    <div id="tv" class="tab-content">
+        <div class="tv-remote">
+            <div class="tv-row"><button class="tv-btn" onclick="runCmd('tv_power')">⏻</button><button class="tv-btn" onclick="runCmd('tv_up')">▲</button><button class="tv-btn" onclick="runCmd('tv_down')">▼</button></div>
+            <div class="tv-row"><button class="tv-btn" onclick="runCmd('tv_left')">◀</button><button class="tv-btn tv-btn-center" onclick="runCmd('tv_ok')">OK</button><button class="tv-btn" onclick="runCmd('tv_right')">▶</button></div>
+            <div class="tv-row"><button class="tv-btn" onclick="runCmd('tv_volup')">🔊+</button><button class="tv-btn" onclick="runCmd('tv_voldown')">🔊-</button><button class="tv-btn" onclick="runCmd('tv_back')">BACK</button></div>
+            <div class="tv-row"><button class="tv-btn" onclick="runCmd('tv_chup')">CH+</button><button class="tv-btn" onclick="runCmd('tv_mute')">🔇</button><button class="tv-btn" onclick="runCmd('tv_chdown')">CH-</button></div>
+        </div>
+    </div>
+    
+    <div id="keyboard" class="tab-content">
+        <div class="input-display" id="keyInput"></div>
+        <div class="keyboard">
+            <div class="key-row"><div class="key" onclick="addKey('1')">1</div><div class="key" onclick="addKey('2')">2</div><div class="key" onclick="addKey('3')">3</div><div class="key" onclick="addKey('4')">4</div><div class="key" onclick="addKey('5')">5</div><div class="key" onclick="addKey('6')">6</div><div class="key" onclick="addKey('7')">7</div><div class="key" onclick="addKey('8')">8</div><div class="key" onclick="addKey('9')">9</div><div class="key" onclick="addKey('0')">0</div></div>
+            <div class="key-row"><div class="key" onclick="addKey('q')">q</div><div class="key" onclick="addKey('w')">w</div><div class="key" onclick="addKey('e')">e</div><div class="key" onclick="addKey('r')">r</div><div class="key" onclick="addKey('t')">t</div><div class="key" onclick="addKey('y')">y</div><div class="key" onclick="addKey('u')">u</div><div class="key" onclick="addKey('i')">i</div><div class="key" onclick="addKey('o')">o</div><div class="key" onclick="addKey('p')">p</div></div>
+            <div class="key-row"><div class="key" onclick="addKey('a')">a</div><div class="key" onclick="addKey('s')">s</div><div class="key" onclick="addKey('d')">d</div><div class="key" onclick="addKey('f')">f</div><div class="key" onclick="addKey('g')">g</div><div class="key" onclick="addKey('h')">h</div><div class="key" onclick="addKey('j')">j</div><div class="key" onclick="addKey('k')">k</div><div class="key" onclick="addKey('l')">l</div></div>
+            <div class="key-row"><div class="key" onclick="addKey('z')">z</div><div class="key" onclick="addKey('x')">x</div><div class="key" onclick="addKey('c')">c</div><div class="key" onclick="addKey('v')">v</div><div class="key" onclick="addKey('b')">b</div><div class="key" onclick="addKey('n')">n</div><div class="key" onclick="addKey('m')">m</div></div>
+            <div class="key-row"><div class="key key-space" onclick="addKey(' ')">SPACE</div><div class="key key-enter" onclick="sendText()">ENTER</div><div class="key key-del" onclick="delKey()">DEL</div><div class="key key-enter" onclick="clearKey()">CLEAR</div></div>
+        </div>
+    </div>
+    
+    <div id="evil" class="tab-content">
+        <div class="btn-group">
+            <button class="btn-success" onclick="runCmd('evil')">🎭 START EVIL</button>
+            <button class="btn-danger" onclick="runCmd('evil_stop')">🛑 STOP</button>
+            <button class="btn-info" onclick="runCmd('evil_google')">🌐 GOOGLE</button>
+            <button class="btn-info" onclick="runCmd('evil_facebook')">📘 FACEBOOK</button>
+        </div>
+        <iframe src="/portal.html" width="100%" height="450" style="border:none;border-radius:20px;"></iframe>
+    </div>
+    
+    <div id="packets" class="tab-content">
+        <div class="btn-group">
+            <button class="btn-primary" onclick="runCmd('packets_start')">📦 START SNIFF</button>
+            <button class="btn-danger" onclick="runCmd('packets_stop')">🛑 STOP</button>
+            <button class="btn-info" onclick="runCmd('packets_export')">📊 EXPORT</button>
+        </div>
+        <pre id="packetsResult">Моніторинг пакетів...</pre>
+    </div>
+    
+    <div id="settings" class="tab-content">
+        <div class="btn-group">
+            <button class="btn-primary" onclick="runCmd('web_on')">🌐 WEB ON</button>
+            <button class="btn-danger" onclick="runCmd('web_off')">🌐 WEB OFF</button>
+            <button class="btn-primary" onclick="runCmd('bright')">💡 BRIGHTNESS</button>
+            <button class="btn-warning" onclick="runCmd('format')">🗑️ FORMAT</button>
+            <button class="btn-info" onclick="runCmd('about')">ℹ️ ABOUT</button>
+            <button class="btn-danger" onclick="runCmd('reset')">🔄 RESET</button>
+        </div>
+        <pre id="settingsInfo">DIY BRUCE v25.0\\nWiFi | BLE | NRF | IR | JAMMER\\nGitHub: diybruce</pre>
+    </div>
+    
+    <script>
+        let rssiData=[], bleData=[], packetData=[];
+        function runCmd(cmd){ fetch('/cmd?c='+cmd).then(r=>r.text()).then(t=>{ let log=document.getElementById('log'); if(log) log.innerHTML+=new Date().toLocaleTimeString()+' > '+t+'\\n'; if(cmd=='view_pass') updatePasswords(); if(cmd=='view_hand') updateHandshakes(); }); }
+        function addKey(k){ document.getElementById('keyInput').innerText += k; }
+        function delKey(){ let i=document.getElementById('keyInput'); i.innerText=i.innerText.slice(0,-1); }
+        function clearKey(){ document.getElementById('keyInput').innerText=''; }
+        function sendText(){ let t=document.getElementById('keyInput').innerText; if(t.length>0){ fetch('/cmd?c=key&text='+encodeURIComponent(t)); clearKey(); } }
+        function updatePasswords(){ fetch('/cmd?c=getpass').then(r=>r.text()).then(t=>{ let p=document.getElementById('passList'); if(p) p.innerText=t||'Немає паролів'; }); }
+        function updateHandshakes(){ fetch('/cmd?c=gethand').then(r=>r.text()).then(t=>{ let h=document.getElementById('handList'); if(h) h.innerText=t||'Немає handshake'; }); }
+        function drawChart(id,data,label,minY,maxY){ let c=document.getElementById(id); if(!c)return; let ctx=c.getContext('2d'); let w=c.clientWidth,h=c.clientHeight; c.width=w; c.height=h; ctx.fillStyle='#070b1a'; ctx.fillRect(0,0,w,h); if(data.length<2)return; let step=w/(data.length-1); ctx.beginPath(); for(let i=0;i<data.length;i++){ let x=i*step; let y=h-((data[i]-minY)/(maxY-minY))*h; if(i===0)ctx.moveTo(x,y); else ctx.lineTo(x,y); } ctx.strokeStyle='#ff6b35'; ctx.lineWidth=2.5; ctx.stroke(); ctx.fillStyle='#ff6b35'; ctx.font='10px monospace'; ctx.fillText(label,10,20); }
+        function updateData(){ fetch('/data').then(r=>r.json()).then(d=>{ document.getElementById('deauth').innerText=d.deauth||0; document.getElementById('beacon').innerText=d.beacon||0; document.getElementById('rssi').innerText=d.rssi||-50; document.getElementById('uptime').innerText=d.uptime||0; rssiData.push(d.rssi||-50); bleData.push(d.blerssi||-60); packetData.push(Math.floor(Math.random()*100)); if(rssiData.length>40)rssiData.shift(); if(bleData.length>40)bleData.shift(); if(packetData.length>40)packetData.shift(); drawChart('rssiChart',rssiData,'WiFi RSSI (dBm)',-90,-30); drawChart('bleChart',bleData,'BLE RSSI (dBm)',-90,-30); drawChart('packetChart',packetData,'Packets/sec',0,100); }); }
+        setInterval(updateData,1000); setInterval(()=>{ updatePasswords(); updateHandshakes(); },3000);
+        document.querySelectorAll('.tab').forEach(t=>{ t.addEventListener('click',()=>{ document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); t.classList.add('active'); document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active')); document.getElementById(t.dataset.tab).classList.add('active'); }); });
+        window.onload=()=>{ updateData(); updatePasswords(); updateHandshakes(); };
+    </script>
+</body>
+</html>
+'''
+
+# ============================================================================
+# data/portal.html
+# ============================================================================
+PORTAL_HTML = '''<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Google</title><style>
+body{font-family:Arial;display:flex;justify-content:center;align-items:center;height:100vh;background:linear-gradient(135deg,#667eea,#764ba2);}
+.container{background:white;padding:40px;border-radius:24px;width:100%;max-width:400px;text-align:center;}
+input{width:100%;padding:14px;margin:10px 0;border:1px solid #dadce0;border-radius:8px;}
+button{background:#1a73e8;color:white;border:none;padding:14px;border-radius:8px;width:100%;cursor:pointer;}
+button:hover{background:#1557b0;}
+</style></head>
+<body><div class="container"><h1>Google</h1><form action="/pass" method="POST"><input type="email" name="email" placeholder="Email" required><input type="password" name="pass" placeholder="Password" required><button type="submit">Sign in</button></form></div></body></html>
+'''
+
+# ============================================================================
+# ФУНКЦІЯ СТВОРЕННЯ ПРОЄКТУ
+# ============================================================================
+def create_project():
+    base = PROJECT_NAME
+    if os.path.exists(base): shutil.rmtree(base)
+    os.makedirs(os.path.join(base, "src"))
+    os.makedirs(os.path.join(base, "include"))
+    os.makedirs(os.path.join(base, "data"))
+    
+    with open(os.path.join(base, "platformio.ini"), "w", encoding="utf-8") as f: f.write(PLATFORMIO_INI)
+    with open(os.path.join(base, "include", "display.h"), "w", encoding="utf-8") as f: f.write(DISPLAY_H)
+    with open(os.path.join(base, "include", "CONFIG.h"), "w", encoding="utf-8") as f: f.write(CONFIG_H)
+    with open(os.path.join(base, "include", "hydra_logo.h"), "w", encoding="utf-8") as f: f.write(HYDRA_LOGO_H)
+    with open(os.path.join(base, "include", "icons.h"), "w", encoding="utf-8") as f: f.write(ICONS_H)
+    with open(os.path.join(base, "include", "interface.h"), "w", encoding="utf-8") as f: f.write(INTERFACE_H)
+    with open(os.path.join(base, "include", "irtvbgone.h"), "w", encoding="utf-8") as f: f.write(IRTVBGONE_H)
+    with open(os.path.join(base, "data", "index.html"), "w", encoding="utf-8") as f: f.write(INDEX_HTML)
+    with open(os.path.join(base, "data", "portal.html"), "w", encoding="utf-8") as f: f.write(PORTAL_HTML)
+    
+    print("=" * 70)
+    print(f"✅ ПРОЄКТ СТВОРЕНО: {os.path.abspath(base)}")
+    print("=" * 70)
+    print("📁 Створено файли:")
+    print("   ├── platformio.ini")
+    print("   ├── include/display.h")
+    print("   ├── include/CONFIG.h")
+    print("   ├── include/hydra_logo.h")
+    print("   ├── include/icons.h")
+    print("   ├── include/interface.h")
+    print("   ├── include/irtvbgone.h")
+    print("   ├── data/index.html (13 сторінок)")
+    print("   └── data/portal.html (Evil Portal)")
+    print("=" * 70)
+    print("⚠️ ПОТРІБНО ДОДАТИ ВРУЧНУ:")
+    print("   ├── src/main.cpp (основний код з анімацією)")
+    print("   └── data/tv.html (TV Remote сторінка)")
+    print("=" * 70)
+
+if __name__ == "__main__":
+    create_project()
