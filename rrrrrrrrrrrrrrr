@@ -1,0 +1,73 @@
+Compiling .pio\build\esp32dev\lib7b9\U8g2\clib\mui_u8g2.c.o
+In file included from src/main.cpp:25:
+include/interface.h: In function 'void drawMainMenuDots(DisplayType&)':
+include/interface.h:26:104: error: no matching function for call to 'U8G2_SSD1306_128X64_NONAME_F_HW_I2C::drawBitmap(int, int, const unsigned char [4], int, int, int)'
+     display.drawBitmap(122, MAIN_MENU_DOT_START_Y + (i * MAIN_MENU_DOT_STEP_Y), image_DOT_bits, 4, 4, 1);
+                                                                                                        ^
+In file included from src/main.cpp:8:
+.pio/libdeps/esp32dev/U8g2/src/U8g2lib.h:252:10: note: candidate: 'void U8G2::drawBitmap(u8g2_uint_t, u8g2_uint_t, u8g2_uint_t, u8g2_uint_t, const uint8_t*)'
+     void drawBitmap(u8g2_uint_t x, u8g2_uint_t y, u8g2_uint_t cnt, u8g2_uint_t h, const uint8_t *bitmap)
+          ^~~~~~~~~~
+.pio/libdeps/esp32dev/U8g2/src/U8g2lib.h:252:10: note:   candidate expects 5 arguments, 6 provided
+Compiling .pio\build\esp32dev\lib7b9\U8g2\clib\u8g2_arc.c.o
+In file included from src/main.cpp:25:
+include/interface.h: In function 'void drawMainMenuSelectedDot(DisplayType&, int16_t)':
+include/interface.h:35:56: error: no matching function for call to 'U8G2_SSD1306_128X64_NONAME_F_HW_I2C::drawBitmap(int, int16_t&, const unsigned char [4], int, int, int)'
+Compiling .pio\build\esp32dev\lib7b9\U8g2\clib\u8g2_bitmap.c.o
+   display.drawBitmap(122, y, image_DOTsel_bits, 4, 4, 1);
+                                                        ^
+In file included from src/main.cpp:8:
+.pio/libdeps/esp32dev/U8g2/src/U8g2lib.h:252:10: note: candidate: 'void U8G2::drawBitmap(u8g2_uint_t, u8g2_uint_t, u8g2_uint_t, u8g2_uint_t, const uint8_t*)'
+     void drawBitmap(u8g2_uint_t x, u8g2_uint_t y, u8g2_uint_t cnt, u8g2_uint_t h, const uint8_t *bitmap)
+          ^~~~~~~~~~
+.pio/libdeps/esp32dev/U8g2/src/U8g2lib.h:252:10: note:   candidate expects 5 arguments, 6 provided
+Compiling .pio\build\esp32dev\lib7b9\U8g2\clib\u8g2_box.c.o
+In file included from src/main.cpp:25:
+include/interface.h: In function 'void drawMainMenuPage(DisplayType&, byte, int16_t)':
+include/interface.h:41:13: error: 'DisplayType' {aka 'class U8G2_SSD1306_128X64_NONAME_F_HW_I2C'} has no member named 'setTextColor'; did you mean 'setDrawColor'?
+Compiling .pio\build\esp32dev\lib7b9\U8g2\clib\u8g2_buffer.c.o
+     display.setTextColor(1);
+             ^~~~~~~~~~~~
+             setDrawColor
+include/interface.h:42:13: error: 'DisplayType' {aka 'class U8G2_SSD1306_128X64_NONAME_F_HW_I2C'} has no member named 'setTextSize'
+     display.setTextSize(2);
+             ^~~~~~~~~~~
+include/interface.h:47:13: error: 'DisplayType' {aka 'class U8G2_SSD1306_128X64_NONAME_F_HW_I2C'} has no member named 'setTextColor'; did you mean 'setDrawColor'?
+     display.setTextColor(1);
+             ^~~~~~~~~~~~
+             setDrawColor
+include/interface.h:48:13: error: 'DisplayType' {aka 'class U8G2_SSD1306_128X64_NONAME_F_HW_I2C'} has no member named 'setTextSize'
+     display.setTextSize(2);
+             ^~~~~~~~~~~
+include/interface.h:53:13: error: 'DisplayType' {aka 'class U8G2_SSD1306_128X64_NONAME_F_HW_I2C'} has no member named 'setTextColor'; did you mean 'setDrawColor'?
+     display.setTextColor(1);
+             ^~~~~~~~~~~~
+             setDrawColor
+include/interface.h:54:13: error: 'DisplayType' {aka 'class U8G2_SSD1306_128X64_NONAME_F_HW_I2C'} has no member named 'setTextSize'
+     display.setTextSize(2);
+             ^~~~~~~~~~~
+include/interface.h:59:13: error: 'DisplayType' {aka 'class U8G2_SSD1306_128X64_NONAME_F_HW_I2C'} has no member named 'setTextColor'; did you mean 'setDrawColor'?
+     display.setTextColor(1);
+             ^~~~~~~~~~~~
+             setDrawColor
+include/interface.h:60:13: error: 'DisplayType' {aka 'class U8G2_SSD1306_128X64_NONAME_F_HW_I2C'} has no member named 'setTextSize'
+     display.setTextSize(2);
+             ^~~~~~~~~~~
+include/interface.h:65:13: error: 'DisplayType' {aka 'class U8G2_SSD1306_128X64_NONAME_F_HW_I2C'} has no member named 'setTextColor'; did you mean 'setDrawColor'?
+     display.setTextColor(1);
+             ^~~~~~~~~~~~
+             setDrawColor
+include/interface.h:66:13: error: 'DisplayType' {aka 'class U8G2_SSD1306_128X64_NONAME_F_HW_I2C'} has no member named 'setTextSize'
+     display.setTextSize(2);
+             ^~~~~~~~~~~
+include/interface.h:71:13: error: 'DisplayType' {aka 'class U8G2_SSD1306_128X64_NONAME_F_HW_I2C'} has no member named 'setTextColor'; did you mean 'setDrawColor'?
+     display.setTextColor(1);
+             ^~~~~~~~~~~~
+             setDrawColor
+include/interface.h:72:13: error: 'DisplayType' {aka 'class U8G2_SSD1306_128X64_NONAME_F_HW_I2C'} has no member named 'setTextSize'
+     display.setTextSize(2);
+             ^~~~~~~~~~~
+*** [.pio\build\esp32dev\src\main.cpp.o] Error 1
+================================================== [FAILED] Took 17.41 seconds ==================================================
+ *  The terminal process "C:\Users\QlsUkr\.platformio\penv\Scripts\platformio.exe 'run'" terminated with exit code: 1. 
+ *  Terminal will be reused by tasks, press any key to close it. 
