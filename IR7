@@ -1,0 +1,13 @@
+void setup() {
+  Serial.begin(115200);
+  pinMode(22, INPUT);
+  Serial.println("Тест - натискайте кнопку");
+}
+
+void loop() {
+  int val = digitalRead(22);
+  if (val == LOW) {
+    Serial.println("SIGNAL!");
+    delay(500);
+  }
+}
