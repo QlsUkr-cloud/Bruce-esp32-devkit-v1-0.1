@@ -1,0 +1,23 @@
+#include <IRremote.h>
+
+#define IR_PIN 22
+
+IRrecv irrecv(IR_PIN);
+
+void setup() {
+  Serial.begin(115200);
+  irrecv.enableIRIn();
+  Serial.println("IR READY");
+}
+
+void loop() {
+  if (irrecv.decode()) {
+    unsigned long value = irrecv.decodedIRData.decodedRawData;
+    if (value != 0 && value != 0xFFFFFFFF) {
+      Serial.print("HEX: 0x");
+      Serial.println(value, HEX);
+    }
+    irrecv.resume();
+    delay(200);
+  }
+}
