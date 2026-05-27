@@ -1,0 +1,48 @@
+#include <IRremote.h>
+
+#define IR_RECV_PIN 2   // Підключіть OUT датчика до піна 2
+
+IRrecv irrecv(IR_RECV_PIN);
+decode_results results;
+
+void setup() {
+  Serial.begin(115200);
+  irrecv.enableIRIn();
+  Serial.println("===================================");
+  Serial.println("IR RECEIVER READY");
+  Serial.println("Натискайте кнопки на пульті");
+  Serial.println("===================================");
+}
+
+void loop() {
+  if (irrecv.decode(&results)) {
+    Serial.println("-----------------------------------");
+    Serial.print("HEX: 0x");
+    Serial.println(results.value, HEX);
+    Serial.print("DEC: ");
+    Serial.println(results.value);
+    Serial.print("Bits: ");
+    Serial.println(results.bits);
+    Serial.print("Protocol: ");
+    
+    switch(results.decode_type) {
+      case NEC: Serial.println("NEC"); break;
+      case SAMSUNG: Serial.println("SAMSUNG"); break;
+      case SONY: Serial.println("SONY"); break;
+      case RC5: Serial.println("RC5"); break;
+      case RC6: Serial.println("RC6"); break;
+      case PANASONIC: Serial.println("PANASONIC"); break;
+      case LG: Serial.println("LG"); break;
+      case SHARP: Serial.println("SHARP"); break;
+      default: Serial.println("UNKNOWN");
+    }
+    
+    Serial.print("COPY THIS: irsend.sendNEC(0x");
+    Serial.print(results.value, HEX);
+    Serial.println(", 32);");
+    Serial.println("-----------------------------------");
+    
+    irrecv.resume();
+    delay(500);
+  }
+}
