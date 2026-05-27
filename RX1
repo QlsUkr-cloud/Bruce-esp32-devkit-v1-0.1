@@ -1,0 +1,33 @@
+#include <IRremote.h>
+
+#define IR_PIN 19   // RX1 - може працювати як звичайний цифровий пін
+
+IRrecv irrecv(IR_PIN);
+
+void setup() {
+  Serial.begin(115200);
+  
+  // ВАЖЛИВО: Вимкнути Serial1 якщо він використовує цей пін
+  Serial1.end();  // Звільняємо пін 19 від UART функції
+  
+  irrecv.enableIRIn();
+  pinMode(13, OUTPUT);
+  
+  Serial.println("=================================");
+  Serial.println("IR TEST - MEGA 2560");
+  Serial.println("Підключіть OUT датчика до ПІН 19 (RX1)");
+  Serial.println("=================================");
+}
+
+void loop() {
+  if (irrecv.decode()) {
+    digitalWrite(13, HIGH);
+    
+    Serial.print("HEX: 0x");
+    Serial.println(irrecv.decodedIRData.decodedRawData, HEX);
+    
+    digitalWrite(13, LOW);
+    irrecv.resume();
+    delay(100);
+  }
+}
