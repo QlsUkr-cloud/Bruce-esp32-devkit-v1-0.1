@@ -1,0 +1,23 @@
+#include <IRremote.h>
+
+#define IR_PIN 22
+
+IRrecv irrecv(IR_PIN);
+
+void setup() {
+  Serial.begin(115200);
+  irrecv.enableIRIn();
+  irrecv.setTolerance(25);  // Збільшуємо допуск
+  Serial.println("IR Ready - натискайте кнопки");
+}
+
+void loop() {
+  if (irrecv.decode()) {
+    if (irrecv.decodedIRData.decodedRawData != 0xFFFFFFFF) {
+      Serial.print("HEX: 0x");
+      Serial.println(irrecv.decodedIRData.decodedRawData, HEX);
+    }
+    irrecv.resume();
+    delay(150);  // Затримка для фільтрації шуму
+  }
+}
